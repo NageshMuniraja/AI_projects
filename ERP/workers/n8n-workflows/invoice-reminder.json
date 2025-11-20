@@ -1,0 +1,108 @@
+{
+  "name": "Invoice Reminder Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "invoice-reminder",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "invoice-reminder"
+    },
+    {
+      "parameters": {
+        "functionCode": "const invoices = items[0].json.invoices;\nconst results = [];\n\nfor (const invoice of invoices) {\n  const daysOverdue = Math.floor((Date.now() - new Date(invoice.dueDate)) / (1000 * 60 * 60 * 24));\n  \n  results.push({\n    json: {\n      invoiceNumber: invoice.invoiceNumber,\n      vendorName: invoice.vendorName,\n      amount: invoice.amount,\n      daysOverdue: daysOverdue,\n      email: invoice.vendorEmail\n    }\n  });\n}\n\nreturn results;"
+      },
+      "name": "Process Invoices",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "message",
+        "operation": "send",
+        "to": "={{$json.email}}",
+        "subject": "Payment Reminder: Invoice {{$json.invoiceNumber}}",
+        "emailType": "html",
+        "message": "<p>Dear {{$json.vendorName}},</p>\n<p>This is a friendly reminder that invoice <strong>{{$json.invoiceNumber}}</strong> for <strong>${{$json.amount}}</strong> is now <strong>{{$json.daysOverdue}} days overdue</strong>.</p>\n<p>Please arrange payment at your earliest convenience.</p>\n<p>Best regards,<br>Finance Team</p>"
+      },
+      "name": "Send Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.API_BASE_URL}}/api/agents/finance/log-action",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "action",
+              "value": "invoice_reminder_sent"
+            },
+            {
+              "name": "invoice_number",
+              "value": "={{$json.invoiceNumber}}"
+            },
+            {
+              "name": "days_overdue",
+              "value": "={{$json.daysOverdue}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Log Action",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [850, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Process Invoices",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Invoices": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email": {
+      "main": [
+        [
+          {
+            "node": "Log Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {},
+  "staticData": null
+}

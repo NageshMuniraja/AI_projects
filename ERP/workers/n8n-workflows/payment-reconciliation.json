@@ -1,0 +1,236 @@
+{
+  "name": "Payment Reconciliation Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "payment-reconciliation",
+        "responseMode": "onReceived"
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "payment-reconciliation"
+    },
+    {
+      "parameters": {
+        "functionCode": "const payment = items[0].json.payment;\n\nreturn [{\n  json: {\n    paymentId: payment.id,\n    amount: payment.amount,\n    currency: payment.currency,\n    customerEmail: payment.customer_email,\n    reference: payment.reference || payment.invoice_id,\n    timestamp: payment.created_at\n  }\n}];"
+      },
+      "name": "Parse Payment Data",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.API_BASE_URL}}/api/invoices/search",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "amount",
+              "value": "={{$json.amount}}"
+            },
+            {
+              "name": "reference",
+              "value": "={{$json.reference}}"
+            }
+          ]
+        }
+      },
+      "name": "Find Matching Invoice",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.matched}}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "Check Match",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.API_BASE_URL}}/api/invoices/{{$json.invoice_id}}/mark-paid",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "payment_id",
+              "value": "={{$json.paymentId}}"
+            },
+            {
+              "name": "payment_date",
+              "value": "={{$json.timestamp}}"
+            },
+            {
+              "name": "amount",
+              "value": "={{$json.amount}}"
+            }
+          ]
+        }
+      },
+      "name": "Mark Invoice as Paid",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [1050, 200]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.SNOWFLAKE_API_URL}}/execute",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "query",
+              "value": "INSERT INTO raw_data.payment_transactions (id, team_id, amount, currency, invoice_id, status) VALUES (?, ?, ?, ?, ?, 'reconciled')"
+            },
+            {
+              "name": "params",
+              "value": "={{JSON.stringify([$json.paymentId, $json.teamId, $json.amount, $json.currency, $json.invoice_id])}}"
+            }
+          ]
+        }
+      },
+      "name": "Log to Snowflake",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [1250, 200]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.API_BASE_URL}}/api/finance/flag-unmatched",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "payment_id",
+              "value": "={{$json.paymentId}}"
+            },
+            {
+              "name": "amount",
+              "value": "={{$json.amount}}"
+            },
+            {
+              "name": "reason",
+              "value": "No matching invoice found"
+            }
+          ]
+        }
+      },
+      "name": "Flag for Manual Review",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [1050, 400]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "message",
+        "operation": "send",
+        "to": "finance@company.com",
+        "subject": "Payment Requires Manual Review",
+        "emailType": "html",
+        "message": "<p>A payment could not be automatically reconciled:</p>\n<ul>\n<li><strong>Payment ID:</strong> {{$json.paymentId}}</li>\n<li><strong>Amount:</strong> {{$json.amount}} {{$json.currency}}</li>\n<li><strong>Reference:</strong> {{$json.reference}}</li>\n</ul>\n<p>Please review and reconcile manually.</p>"
+      },
+      "name": "Notify Finance Team",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 1,
+      "position": [1250, 400]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse Payment Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Payment Data": {
+      "main": [
+        [
+          {
+            "node": "Find Matching Invoice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Matching Invoice": {
+      "main": [
+        [
+          {
+            "node": "Check Match",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Match": {
+      "main": [
+        [
+          {
+            "node": "Mark Invoice as Paid",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Flag for Manual Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Invoice as Paid": {
+      "main": [
+        [
+          {
+            "node": "Log to Snowflake",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Flag for Manual Review": {
+      "main": [
+        [
+          {
+            "node": "Notify Finance Team",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

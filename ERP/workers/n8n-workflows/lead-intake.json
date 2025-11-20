@@ -1,0 +1,166 @@
+{
+  "name": "Lead Intake Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead-intake",
+        "responseMode": "onReceived"
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "lead-intake"
+    },
+    {
+      "parameters": {
+        "functionCode": "const lead = items[0].json.lead;\nconst sequence = items[0].json.sequence;\n\nreturn [{\n  json: {\n    leadId: lead.id,\n    email: lead.email,\n    fullName: lead.full_name,\n    company: lead.company,\n    priority: lead.priority,\n    sequence: sequence\n  }\n}];"
+      },
+      "name": "Parse Lead Data",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.CRM_API_URL}}/contacts",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"email\": \"{{$json.email}}\",\n  \"firstname\": \"{{$json.fullName}}\",\n  \"company\": \"{{$json.company}}\",\n  \"lifecyclestage\": \"lead\",\n  \"hs_lead_status\": \"NEW\"\n}"
+      },
+      "name": "Create CRM Contact",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [650, 200]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "message",
+        "operation": "send",
+        "to": "={{$json.email}}",
+        "subject": "Welcome! Let's explore how we can help",
+        "emailType": "html",
+        "message": "<p>Hi {{$json.fullName}},</p>\n<p>Thank you for your interest in our platform!</p>\n<p>I'd love to learn more about {{$json.company}} and how we can help automate your business operations.</p>\n<p>Would you be available for a quick 15-minute call this week?</p>\n<p>Best regards,<br>Sales Team</p>"
+      },
+      "name": "Send Welcome Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 1,
+      "position": [650, 400]
+    },
+    {
+      "parameters": {
+        "unit": "days",
+        "amount": 2
+      },
+      "name": "Wait 2 Days",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [850, 400]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "message",
+        "operation": "send",
+        "to": "={{$json.email}}",
+        "subject": "Quick follow-up",
+        "emailType": "html",
+        "message": "<p>Hi {{$json.fullName}},</p>\n<p>I wanted to follow up on my previous email. Have you had a chance to think about exploring our platform?</p>\n<p>I've attached a case study from a company similar to {{$json.company}} that achieved great results.</p>\n<p>Let me know if you'd like to discuss!</p>"
+      },
+      "name": "Follow-up Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 1,
+      "position": [1050, 400]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.API_BASE_URL}}/api/leads/{{$json.leadId}}/activity",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "activity_type",
+              "value": "email"
+            },
+            {
+              "name": "description",
+              "value": "Follow-up email sent"
+            }
+          ]
+        }
+      },
+      "name": "Log Activity",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [1250, 400]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse Lead Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Lead Data": {
+      "main": [
+        [
+          {
+            "node": "Create CRM Contact",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send Welcome Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Welcome Email": {
+      "main": [
+        [
+          {
+            "node": "Wait 2 Days",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 2 Days": {
+      "main": [
+        [
+          {
+            "node": "Follow-up Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Follow-up Email": {
+      "main": [
+        [
+          {
+            "node": "Log Activity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
