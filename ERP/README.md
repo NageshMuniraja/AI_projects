@@ -310,8 +310,8 @@ Proprietary - All rights reserved
 ## 🆘 Support
 
 For issues and questions:
-- Email: support@yourdomain.com
-- Slack: [Team workspace]
+- Email: naagesh2206@gmail.com
+- Slack: 
 - Docs: https://docs.yourdomain.com
 
 ---
