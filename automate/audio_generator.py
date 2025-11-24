@@ -14,6 +14,9 @@ class AudioGenerator:
     
     def __init__(self):
         self.api_key = Config.ELEVENLABS_API_KEY
+        if not self.api_key:
+            logger.error("ELEVENLABS_API_KEY is not set. Set ELEVENLABS_API_KEY in your environment or .env file.")
+            raise ValueError("Missing ELEVENLABS_API_KEY")
         self.voice_id = Config.ELEVENLABS_VOICE_ID
         self.base_url = "https://api.elevenlabs.io/v1"
     
@@ -47,6 +50,7 @@ class AudioGenerator:
         
         # Clean the script
         text = self.clean_script(script)
+        #text = self.clean_script(script)[:75] # remove this line after testing
         
         url = f"{self.base_url}/text-to-speech/{voice_id}"
         headers = {
@@ -58,7 +62,7 @@ class AudioGenerator:
         # Voice settings optimized for children's content
         data = {
             "text": text,
-            "model_id": "eleven_monolingual_v1",
+            "model_id": "eleven_multilingual_v2",
             "voice_settings": {
                 "stability": 0.5,  # More dynamic
                 "similarity_boost": 0.75,
@@ -70,21 +74,25 @@ class AudioGenerator:
         try:
             logger.info(f"Generating audio for {len(text)} characters...")
             response = requests.post(url, json=data, headers=headers)
-            response.raise_for_status()
-            
+
+            # Explicitly handle non-2xx responses
+            if not response.ok:
+                logger.error(f"Failed to generate audio: HTTP {response.status_code} - {response.text}")
+                return None
+
             # Save audio file
             output_path = Path(output_path)
             output_path.parent.mkdir(parents=True, exist_ok=True)
-            
+
             with open(output_path, 'wb') as f:
                 f.write(response.content)
-            
+
             logger.info(f"Audio saved to {output_path}")
             return str(output_path)
-            
+
         except requests.exceptions.RequestException as e:
             logger.error(f"Error generating audio: {e}")
-            if hasattr(e.response, 'text'):
+            if hasattr(e, 'response') and e.response is not None:
                 logger.error(f"Response: {e.response.text}")
             return None
     
@@ -119,6 +127,9 @@ class AudioGenerator:
             audio = AudioSegment.from_mp3(audio_path)
             duration = len(audio) / 1000.0  # Convert to seconds
             return duration
+        except FileNotFoundError:
+            logger.error(f"Audio file not found: {audio_path}")
+            return 0
         except Exception as e:
             logger.error(f"Error getting audio duration: {e}")
             return 0

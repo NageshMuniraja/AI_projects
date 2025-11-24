@@ -10,6 +10,23 @@ from moviepy.editor import (
 )
 from config import Config
 
+# Pillow compatibility shim: older code and libraries may reference Image.ANTIALIAS
+try:
+    from PIL import Image as PILImage
+    if not hasattr(PILImage, 'ANTIALIAS'):
+        # Pillow 10+ moved ANTIALIAS to Resampling.LANCZOS
+        try:
+            PILImage.ANTIALIAS = PILImage.Resampling.LANCZOS
+        except Exception:
+            # Fallback to LANCZOS constant if available
+            if hasattr(PILImage, 'LANCZOS'):
+                PILImage.ANTIALIAS = PILImage.LANCZOS
+            else:
+                PILImage.ANTIALIAS = 1
+except Exception:
+    # If PIL is not available, let imports/error handling later surface the issue
+    pass
+
 logger = logging.getLogger(__name__)
 
 class VideoAssembler:

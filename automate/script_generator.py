@@ -14,7 +14,21 @@ class ScriptGenerator:
     
     def __init__(self):
         self.client = OpenAI(api_key=Config.OPENAI_API_KEY)
-    
+
+    def _parse_json_message(self, content):
+        """Safely parse JSON from model message content (strip markdown fences)."""
+        if not content:
+            raise ValueError("Empty content to parse")
+        text = content.strip()
+        if text.startswith("```"):
+            parts = text.split("```", 2)
+            if len(parts) >= 2:
+                text = parts[1]
+                if text.lstrip().startswith(('json', 'json\n')):
+                    text = '\n'.join(text.split('\n')[1:])
+        text = text.strip().strip('`').strip()
+        return json.loads(text)
+
     def generate_shorts_script(self, idea):
         """Generate script for 60-second short/reel"""
         prompt = f"""
@@ -56,11 +70,10 @@ class ScriptGenerator:
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.8,
-                max_tokens=1000,
-                response_format={"type": "json_object"}
+                max_tokens=1000
             )
             
-            script_data = json.loads(response.choices[0].message.content)
+            script_data = self._parse_json_message(response.choices[0].message.content)
             logger.info(f"Generated shorts script: {script_data['word_count']} words")
             return script_data
             
@@ -119,11 +132,10 @@ class ScriptGenerator:
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.8,
-                max_tokens=2000,
-                response_format={"type": "json_object"}
+                max_tokens=2000
             )
             
-            script_data = json.loads(response.choices[0].message.content)
+            script_data = self._parse_json_message(response.choices[0].message.content)
             logger.info(f"Generated short video script: {script_data['word_count']} words")
             return script_data
             
@@ -166,11 +178,10 @@ class ScriptGenerator:
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.7,
-                max_tokens=1000,
-                response_format={"type": "json_object"}
+                max_tokens=1000
             )
             
-            visuals = json.loads(response.choices[0].message.content)
+            visuals = self._parse_json_message(response.choices[0].message.content)
             logger.info(f"Generated {len(visuals['visual_prompts'])} visual prompts")
             return visuals
             
@@ -211,11 +222,10 @@ class ScriptGenerator:
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.7,
-                max_tokens=800,
-                response_format={"type": "json_object"}
+                max_tokens=800
             )
             
-            metadata = json.loads(response.choices[0].message.content)
+            metadata = self._parse_json_message(response.choices[0].message.content)
             logger.info("Generated video metadata")
             return metadata
             

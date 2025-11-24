@@ -16,16 +16,34 @@ class ContentIdeaGenerator:
     def __init__(self):
         self.client = OpenAI(api_key=Config.OPENAI_API_KEY)
         self.categories = Config.CONTENT_CATEGORIES
-    
+
+    def _parse_json_message(self, content):
+        """Safely parse JSON from model message content (strip markdown fences)."""
+        if not content:
+            raise ValueError("Empty content to parse")
+        # Remove triple-backtick fenced blocks if present
+        text = content.strip()
+        if text.startswith("```"):
+            parts = text.split("```", 2)
+            if len(parts) >= 2:
+                text = parts[1]
+                # If the fenced block starts with a language identifier like 'json', drop that first line
+                if text.lstrip().startswith(('json', 'json\n')):
+                    text = '\n'.join(text.split('\n')[1:])
+        # Remove any surrounding backticks and whitespace
+        text = text.strip().strip('`').strip()
+        return json.loads(text)
+
     def get_trending_topics(self):
         """Get current trending topics related to kids content and AI"""
         prompt = """
-        List 5 current trending topics (as of November 2023) that would make great 
+        List 5 current trending topics (as of November 2025) that would make great 
         content for children's educational/entertainment videos. Focus on:
         - Educational topics kids love
         - Trending technology/AI topics explained for kids
         - Viral kids activities
         - Popular children's interests
+        - funny AI videos
         
         Return as a simple numbered list.
         """
@@ -62,7 +80,7 @@ class ContentIdeaGenerator:
         Content should be:
         - Quick, engaging, and visually interesting
         - Educational OR entertaining OR devotional
-        - Perfect for kids ages 5-12
+        - Perfect for kids ages 3-12
         - Can be about: fun facts, quick lessons, funny moments, moral stories, cool experiments
         
         Return a JSON object with:
@@ -85,11 +103,10 @@ class ContentIdeaGenerator:
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.9,
-                max_tokens=500,
-                response_format={"type": "json_object"}
+                max_tokens=500
             )
             
-            idea = json.loads(response.choices[0].message.content)
+            idea = self._parse_json_message(response.choices[0].message.content)
             logger.info(f"Generated shorts idea: {idea['title']}")
             return idea
             
@@ -135,11 +152,10 @@ class ContentIdeaGenerator:
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.9,
-                max_tokens=700,
-                response_format={"type": "json_object"}
+                max_tokens=700
             )
             
-            idea = json.loads(response.choices[0].message.content)
+            idea = self._parse_json_message(response.choices[0].message.content)
             logger.info(f"Generated short video idea: {idea['title']}")
             return idea
             

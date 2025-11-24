@@ -52,8 +52,8 @@ class VideoAutomation:
             self.audio_generator = AudioGenerator()
             self.video_generator = VideoGenerator()
             self.video_assembler = VideoAssembler()
-            self.youtube_uploader = YouTubeUploader()
-            self.instagram_uploader = InstagramUploader()
+            #self.youtube_uploader = YouTubeUploader()
+            #self.instagram_uploader = InstagramUploader()
             
             logger.info("All modules initialized successfully")
             
@@ -122,7 +122,7 @@ class VideoAutomation:
             video_clips = []
             logger.info(f"Generating {len(visual_prompts)} video clips...")
             
-            for i, prompt_data in enumerate(visual_prompts[:4]):  # Limit to 4 clips
+            for i, prompt_data in enumerate(visual_prompts[:1]):  # Limit to 4 clips
                 prompt = prompt_data if isinstance(prompt_data, str) else prompt_data.get('prompt', '')
                 output_path = video_dir / f"clip_{i:02d}.mp4"
                 
