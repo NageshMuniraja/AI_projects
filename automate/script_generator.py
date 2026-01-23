@@ -15,20 +15,181 @@ class ScriptGenerator:
     def __init__(self):
         self.client = OpenAI(api_key=Config.OPENAI_API_KEY)
 
+    '''
     def _parse_json_message(self, content):
-        """Safely parse JSON from model message content (strip markdown fences)."""
+        """Safely parse JSON from model message content (strip markdown fences).
+
+        This function attempts multiple recovery strategies when the model returns
+        imperfect JSON (unescaped newlines, extra text, or code fences). It will:
+        - Strip surrounding triple-backtick fences and optional language tags
+        - Extract the first {...} or [...] JSON block if present
+        - Escape raw control characters (newline, tab, carriage) and remove other control chars
+        - Try json.loads on progressively cleaned text
+        """
         if not content:
             raise ValueError("Empty content to parse")
+        import re
         text = content.strip()
+        # Remove surrounding code fences if present
         if text.startswith("```"):
             parts = text.split("```", 2)
             if len(parts) >= 2:
                 text = parts[1]
+                # Remove leading language tag like ```json
                 if text.lstrip().startswith(('json', 'json\n')):
                     text = '\n'.join(text.split('\n')[1:])
         text = text.strip().strip('`').strip()
-        return json.loads(text)
 
+        # Try straightforward parse first
+        try:
+            return json.loads(text)
+        except Exception:
+            pass
+
+        # Try to extract a JSON object/array substring
+        # Look for first {...} or [...] block
+        obj_match = re.search(r"(\{.*\}|\[.*\])", text, re.DOTALL)
+        candidate = obj_match.group(1) if obj_match else text
+
+        # Replace raw newlines, tabs, carriage returns with escaped equivalents
+        # and remove other control characters that break JSON parsing
+        def _sanitize_raw(s: str) -> str:
+            # Escape common whitespace characters
+            s = s.replace('\\r', '\\r').replace('\\n', '\\n')
+            s = s.replace('\r', '\\r').replace('\n', '\\n').replace('\t', '\\t')
+            # Remove control characters except escaped sequences now present
+            s = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', s)
+            return s
+
+        candidate_clean = _sanitize_raw(candidate)
+
+        try:
+            return json.loads(candidate_clean)
+        except Exception as e:
+            # Last-ditch attempt: try to fix common issues like trailing commas
+            try:
+                # Remove trailing commas before } or ]
+                candidate_no_trailing = re.sub(r',\s*([}\]])', r'\1', candidate_clean)
+                return json.loads(candidate_no_trailing)
+            except Exception:
+                raise ValueError(f"Failed to parse JSON from model output: {e}\n---raw content---\n{text}")
+    '''
+    def _parse_json_message(self, content: str):
+        """
+        Robust JSON parser for model outputs.
+
+        Tries (in order):
+        - strip BOM and code fences
+        - direct json.loads
+        - extract first balanced {...} or [...] block and try json.loads
+        - ast.literal_eval (accept Python-style quotes/True/None)
+        - conservative fixes (single->double quotes, True/False/None -> true/false/null, remove trailing commas) then json.loads
+        Raises ValueError with debug info if all attempts fail.
+        """
+        if not content:
+            raise ValueError("Empty content to parse")
+
+        import re, ast, json
+
+        raw = content
+
+        # Remove BOM if present
+        try:
+            raw = raw.encode('utf-8').decode('utf-8-sig')
+        except Exception:
+            # ignore if decode fails
+            pass
+
+        # Trim whitespace and fences
+        raw = raw.strip()
+        if raw.startswith("```"):
+            # remove first code fence block (```json ... ``` or ``` ... ```)
+            parts = raw.split("```", 2)
+            if len(parts) >= 2:
+                raw = parts[1]
+                # remove optional leading language token like "json"
+                if raw.lstrip().lower().startswith("json"):
+                    raw = "\n".join(raw.split("\n")[1:])
+        raw = raw.strip().strip('`').strip()
+
+        # Quick direct JSON attempt
+        try:
+            return json.loads(raw)
+        except Exception:
+            pass
+
+        # Extract first balanced JSON block (object or array)
+        def _extract_first_json_block(s: str) -> str:
+            start_idx = None
+            for i, ch in enumerate(s):
+                if ch in ('{', '['):
+                    start_idx = i
+                    break
+            if start_idx is None:
+                return s
+            pairs = {'{': '}', '[': ']'}
+            stack = []
+            i = start_idx
+            while i < len(s):
+                ch = s[i]
+                if ch in ('{', '['):
+                    stack.append(ch)
+                elif ch in ('}', ']'):
+                    if not stack:
+                        return s[start_idx:i+1]
+                    last = stack[-1]
+                    if pairs[last] == ch:
+                        stack.pop()
+                        if not stack:
+                            return s[start_idx:i+1]
+                i += 1
+            return s[start_idx:]
+
+        candidate = _extract_first_json_block(raw).strip()
+
+        # Try json.loads on candidate
+        try:
+            return json.loads(candidate)
+        except Exception:
+            pass
+
+        # Try ast.literal_eval (accepts single quotes, True/False/None)
+        try:
+            parsed = ast.literal_eval(candidate)
+            return parsed
+        except Exception:
+            pass
+
+        # Conservative fixes then try json.loads
+        def _conservative_fix(s: str) -> str:
+            # Normalize newlines
+            s = s.replace('\r\n', '\n').replace('\r', '\n').strip()
+            # Convert python literals to JSON
+            s = re.sub(r'\bNone\b', 'null', s)
+            s = re.sub(r'\bTrue\b', 'true', s)
+            s = re.sub(r'\bFalse\b', 'false', s)
+            # Remove trailing commas
+            s = re.sub(r',\s*([}\]])', r'\1', s)
+            # Replace smart quotes with standard quotes
+            s = s.replace('“', '"').replace('”', '"').replace("’", "'")
+            # Replace single-quotes with double-quotes conservatively
+            if '"' not in s:
+                s = s.replace("'", '"')
+            else:
+                s = re.sub(r"(?<=[:\s\[,])'([^']*)'(?=[,\]\}\s])", r'"\1"', s)
+            return s
+
+        candidate_fixed = _conservative_fix(candidate)
+        try:
+            return json.loads(candidate_fixed)
+        except Exception as e:
+            # Give helpful debug in exception
+            raise ValueError(
+                f"Failed to parse JSON from model output after multiple attempts: {e}\n"
+                f"---raw content---\n{content}\n"
+                f"---extracted candidate---\n{candidate}\n"
+                f"---candidate_fixed---\n{candidate_fixed}"
+            )
     def generate_shorts_script(self, idea):
         """Generate script for 60-second short/reel"""
         prompt = f"""

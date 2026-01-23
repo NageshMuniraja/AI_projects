@@ -4,9 +4,10 @@ Combines audio, video clips, and text overlays using FFmpeg and MoviePy
 """
 import logging
 from pathlib import Path
+import time
 from moviepy.editor import (
     VideoFileClip, AudioFileClip, concatenate_videoclips,
-    CompositeVideoClip, TextClip, ColorClip
+    CompositeVideoClip, ColorClip
 )
 from config import Config
 
@@ -212,95 +213,150 @@ class VideoAssembler:
         """Trim clips to match target duration"""
         result_clips = []
         remaining_duration = target_duration
-        
+
         for clip in clips:
             if remaining_duration <= 0:
                 break
-            
+
             if clip.duration <= remaining_duration:
                 result_clips.append(clip)
                 remaining_duration -= clip.duration
             else:
-                # Trim the last clip
+                # Trim the last clip using correct MoviePy method 'subclip'
+                # Use (0, remaining_duration) to take the initial portion
                 trimmed = clip.subclip(0, remaining_duration)
                 result_clips.append(trimmed)
                 remaining_duration = 0
-        
-        return concatenate_videoclips(result_clips)
+
+        return concatenate_videoclips(result_clips, method="compose")
     
     def _loop_clips_to_duration(self, clips, target_duration):
         """Loop clips to fill target duration"""
         result_clips = []
         remaining_duration = target_duration
         clip_index = 0
-        
+
         while remaining_duration > 0:
             clip = clips[clip_index % len(clips)]
-            
+
             if clip.duration <= remaining_duration:
                 result_clips.append(clip)
                 remaining_duration -= clip.duration
             else:
+                # Trim the current clip to the remaining time
                 trimmed = clip.subclip(0, remaining_duration)
                 result_clips.append(trimmed)
                 remaining_duration = 0
-            
+
             clip_index += 1
-        
-        return concatenate_videoclips(result_clips)
+
+        return concatenate_videoclips(result_clips, method="compose")
     
     def _add_text_overlays(self, video_clip, text_overlays):
         """Add text overlays to video"""
         composite_clips = [video_clip]
-        
+        temp_images = []
+
         for overlay in text_overlays:
             text = overlay.get('text', '')
             start_time = overlay.get('start', 0)
             duration = overlay.get('duration', 3)
             position = overlay.get('position', 'bottom')
-            
+
             if not text:
                 continue
-            
+
             try:
-                # Create text clip
-                txt_clip = TextClip(
-                    text,
-                    fontsize=60,
-                    color='white',
-                    font='Arial-Bold',
-                    stroke_color='black',
-                    stroke_width=2,
-                    size=(video_clip.w - 100, None),
-                    method='caption',
-                    align='center'
-                )
-                
-                # Position text
+                # Render text to image using Pillow to avoid ImageMagick/TextClip
+                from PIL import Image, ImageDraw, ImageFont
+                from moviepy.editor import ImageClip
+
+                w = video_clip.w - 100
+                # Create image with transparent background
+                # Estimate height by simple linewrap
+                font_size = 60
+                try:
+                    font = ImageFont.truetype("DejaVuSans-Bold.ttf", font_size)
+                except Exception:
+                    font = ImageFont.load_default()
+
+                # Simple word wrap
+                lines = []
+                words = text.split()
+                line = ""
+                img_tmp = Image.new("RGBA", (w, 2000), (0, 0, 0, 0))
+                draw_tmp = ImageDraw.Draw(img_tmp)
+                for word in words:
+                    test = (line + " " + word).strip()
+                    bbox = draw_tmp.textbbox((0, 0), test, font=font)
+                    if bbox[2] > w and line:
+                        lines.append(line)
+                        line = word
+                    else:
+                        line = test
+                if line:
+                    lines.append(line)
+
+                line_h = draw_tmp.textbbox((0, 0), "Ay", font=font)[3]
+                img_h = line_h * len(lines) + 40
+                img = Image.new("RGBA", (w, img_h), (0, 0, 0, 0))
+                draw = ImageDraw.Draw(img)
+
+                y = 20
+                for l in lines:
+                    bbox = draw.textbbox((0, 0), l, font=font)
+                    x = (w - bbox[2]) // 2
+                    draw.text((x, y), l, font=font, fill="white")
+                    y += line_h
+
+                # Save temp image
+                tmp_path = Path(Config.TEMP_DIR) / f"overlay_{int(time.time()*1000)}.png"
+                tmp_path.parent.mkdir(parents=True, exist_ok=True)
+                img.save(tmp_path)
+                temp_images.append(tmp_path)
+
+                # Create ImageClip
+                img_clip = ImageClip(str(tmp_path)).set_duration(duration)
+
+                # Positioning
                 if position == 'bottom':
-                    txt_clip = txt_clip.set_position(('center', video_clip.h - 200))
+                    img_clip = img_clip.set_position(('center', video_clip.h - img_h - 50))
                 elif position == 'top':
-                    txt_clip = txt_clip.set_position(('center', 100))
+                    img_clip = img_clip.set_position(('center', 50))
                 else:
-                    txt_clip = txt_clip.set_position('center')
-                
-                # Set timing
-                txt_clip = txt_clip.set_start(start_time).set_duration(duration)
-                
-                composite_clips.append(txt_clip)
-                
+                    img_clip = img_clip.set_position('center')
+
+                img_clip = img_clip.set_start(start_time)
+                composite_clips.append(img_clip)
+
             except Exception as e:
                 logger.error(f"Error creating text overlay: {e}")
                 continue
-        
-        return CompositeVideoClip(composite_clips)
+
+        composite = CompositeVideoClip(composite_clips)
+
+        # Clean up temp images when finished (MoviePy keeps them while writing)
+        def _cleanup():
+            for p in temp_images:
+                try:
+                    p.unlink()
+                except Exception:
+                    pass
+
+        # Attach cleanup to composite (no direct hook; attempt best-effort after a short delay)
+        try:
+            _cleanup()
+        except Exception:
+            pass
+
+        return composite
     
     def add_intro_outro(self, video_path, intro_text=None, outro_text=None, output_path=None):
         """Add intro and outro screens to video"""
         try:
             main_video = VideoFileClip(video_path)
             clips = []
-            
+
             # Add intro
             if intro_text:
                 intro = self._create_text_screen(
@@ -309,9 +365,9 @@ class VideoAssembler:
                     size=main_video.size
                 )
                 clips.append(intro)
-            
+
             clips.append(main_video)
-            
+
             # Add outro
             if outro_text:
                 outro = self._create_text_screen(
@@ -320,12 +376,12 @@ class VideoAssembler:
                     size=main_video.size
                 )
                 clips.append(outro)
-            
+
             final_video = concatenate_videoclips(clips)
-            
+
             if output_path is None:
                 output_path = video_path.replace('.mp4', '_with_intro_outro.mp4')
-            
+
             final_video.write_videofile(
                 output_path,
                 fps=self.fps,
@@ -333,32 +389,83 @@ class VideoAssembler:
                 audio_codec='aac',
                 logger=None
             )
-            
+
             main_video.close()
             final_video.close()
-            
+
             return output_path
-            
+
         except Exception as e:
             logger.error(f"Error adding intro/outro: {e}")
             return None
     
     def _create_text_screen(self, text, duration, size, bg_color=(100, 150, 255)):
-        """Create a simple text screen"""
-        bg = ColorClip(size=size, color=bg_color, duration=duration)
-        
-        txt = TextClip(
-            text,
-            fontsize=80,
-            color='white',
-            font='Arial-Bold',
-            size=(size[0] - 100, None),
-            method='caption',
-            align='center'
-        )
-        txt = txt.set_position('center').set_duration(duration)
-        
-        return CompositeVideoClip([bg, txt])
+        """Create a simple text screen using Pillow and ImageClip to avoid ImageMagick/TextClip."""
+        try:
+            from PIL import Image, ImageDraw, ImageFont
+            from moviepy.editor import ImageClip, ColorClip
+
+            w, h = size
+            # Create background clip
+            bg = ColorClip(size=size, color=bg_color, duration=duration)
+
+            # Render text image
+            font_size = 80
+            try:
+                font = ImageFont.truetype("DejaVuSans-Bold.ttf", font_size)
+            except Exception:
+                font = ImageFont.load_default()
+
+            text_w = w - 100
+            # Word-wrap
+            words = text.split()
+            lines = []
+            line = ""
+            img_tmp = Image.new("RGBA", (text_w, 2000), (0, 0, 0, 0))
+            draw_tmp = ImageDraw.Draw(img_tmp)
+            for word in words:
+                test = (line + " " + word).strip()
+                bbox = draw_tmp.textbbox((0, 0), test, font=font)
+                if bbox[2] > text_w and line:
+                    lines.append(line)
+                    line = word
+                else:
+                    line = test
+            if line:
+                lines.append(line)
+
+            line_h = draw_tmp.textbbox((0, 0), "Ay", font=font)[3]
+            img_h = line_h * len(lines) + 40
+            img = Image.new("RGBA", (text_w, img_h), (0, 0, 0, 0))
+            draw = ImageDraw.Draw(img)
+
+            y = 20
+            for l in lines:
+                bbox = draw.textbbox((0, 0), l, font=font)
+                x = (text_w - bbox[2]) // 2
+                draw.text((x, y), l, font=font, fill="white")
+                y += line_h
+
+            tmp_path = Path(Config.TEMP_DIR) / f"screen_{int(time.time()*1000)}.png"
+            tmp_path.parent.mkdir(parents=True, exist_ok=True)
+            img.save(tmp_path)
+
+            img_clip = ImageClip(str(tmp_path)).set_duration(duration)
+            img_clip = img_clip.set_position('center')
+
+            screen = CompositeVideoClip([bg, img_clip])
+
+            # Clean up temp image
+            try:
+                tmp_path.unlink()
+            except Exception:
+                pass
+
+            return screen
+
+        except Exception as e:
+            logger.error(f"Error creating text screen: {e}")
+            return None
 
 
 if __name__ == "__main__":

@@ -27,10 +27,18 @@ def setup_logging():
         level=logging.INFO,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         handlers=[
-            logging.FileHandler(log_file),
+            logging.FileHandler(log_file, encoding='utf-8'),
             logging.StreamHandler()
         ]
     )
+    
+    # Fix console encoding for Windows to handle emojis
+    import sys
+    if sys.platform == 'win32':
+        try:
+            sys.stdout.reconfigure(encoding='utf-8')
+        except:
+            pass
     
     return logging.getLogger(__name__)
 
@@ -52,9 +60,21 @@ class VideoAutomation:
             self.audio_generator = AudioGenerator()
             self.video_generator = VideoGenerator()
             self.video_assembler = VideoAssembler()
-            #self.youtube_uploader = YouTubeUploader()
-            #self.instagram_uploader = InstagramUploader()
+            self.youtube_uploader = YouTubeUploader()
             
+            # Initialize optional uploaders; failures should not stop the app
+            # try:
+            #     self.youtube_uploader = YouTubeUploader()
+            # except Exception as e:
+            #     logger.warning(f"YouTubeUploader not initialized: {e}")
+            #     self.youtube_uploader = None
+            
+            try:
+                self.instagram_uploader = InstagramUploader()
+            except Exception as e:
+                logger.warning(f"InstagramUploader not initialized: {e}")
+                self.instagram_uploader = None
+
             logger.info("All modules initialized successfully")
             
         except Exception as e:
@@ -122,7 +142,7 @@ class VideoAutomation:
             video_clips = []
             logger.info(f"Generating {len(visual_prompts)} video clips...")
             
-            for i, prompt_data in enumerate(visual_prompts[:1]):  # Limit to 4 clips
+            for i, prompt_data in enumerate(visual_prompts[:4]):  # Limit to 4 clips
                 prompt = prompt_data if isinstance(prompt_data, str) else prompt_data.get('prompt', '')
                 output_path = video_dir / f"clip_{i:02d}.mp4"
                 
@@ -130,7 +150,8 @@ class VideoAutomation:
                 clip_path = self.video_generator.generate_video_from_text(
                     prompt,
                     duration=5,
-                    output_path=output_path
+                    output_path=output_path,
+                    video_type="shorts"  # 9:16 vertical for Shorts/Reels
                 )
                 
                 if clip_path:
@@ -182,32 +203,41 @@ class VideoAutomation:
             
             # Step 7: Upload to YouTube
             logger.info("Step 7: Uploading to YouTube...")
-            if metadata:
-                youtube_result = self.youtube_uploader.upload_shorts(
-                    video_path=final_video,
-                    title=metadata['youtube_title'],
-                    description=metadata['youtube_description'],
-                    tags=metadata['youtube_tags']
-                )
-                
-                if youtube_result:
-                    logger.info(f"YouTube upload successful: {youtube_result['url']}")
-                else:
-                    logger.warning("YouTube upload failed")
-            
+            youtube_result = None
+            if metadata and getattr(self, 'youtube_uploader', None):
+                try:
+                    youtube_result = self.youtube_uploader.upload_shorts(
+                        video_path=final_video,
+                        title=metadata['youtube_title'],
+                        description=metadata['youtube_description'],
+                        tags=metadata['youtube_tags']
+                    )
+                    if youtube_result:
+                        logger.info(f"YouTube upload successful: {youtube_result.get('url')}")
+                    else:
+                        logger.warning("YouTube upload failed")
+                except Exception as e:
+                    logger.error(f"YouTube upload error: {e}")
+            else:
+                if metadata:
+                    logger.warning("YouTubeUploader not available; skipping upload")
+
             # Step 8: Upload to Instagram
             logger.info("Step 8: Uploading to Instagram...")
             logger.warning("Instagram upload requires video hosting - see instagram_uploader.py")
             # Uncomment when video hosting is implemented:
-            # if metadata:
-            #     instagram_result = self.instagram_uploader.upload_reel(
-            #         video_path=final_video,
-            #         caption=metadata['instagram_caption']
-            #     )
-            #     if instagram_result:
-            #         logger.info(f"Instagram upload successful: {instagram_result['permalink']}")
-            
-            # Save session data
+            # if metadata and getattr(self, 'instagram_uploader', None):
+            #     try:
+            #         instagram_result = self.instagram_uploader.upload_reel(
+            #             video_path=final_video,
+            #             caption=metadata['instagram_caption']
+            #         )
+            #         if instagram_result:
+            #             logger.info(f"Instagram upload successful: {instagram_result.get('permalink')}")
+            #     except Exception as e:
+            #         logger.error(f"Instagram upload error: {e}")
+ 
+             # Save session data
             self._save_session_data('shorts', {
                 'date': date_str,
                 'idea': idea,
@@ -291,7 +321,8 @@ class VideoAutomation:
                 clip_path = self.video_generator.generate_video_from_text(
                     prompt,
                     duration=10,
-                    output_path=output_path
+                    output_path=output_path,
+                    video_type="video"  # 16:9 horizontal for regular videos
                 )
                 
                 if clip_path:
@@ -341,18 +372,25 @@ class VideoAutomation:
             
             # Step 7: Upload to YouTube
             logger.info("Step 7: Uploading to YouTube...")
-            if metadata:
-                youtube_result = self.youtube_uploader.upload_regular_video(
-                    video_path=final_video,
-                    title=metadata['youtube_title'],
-                    description=metadata['youtube_description'],
-                    tags=metadata['youtube_tags']
-                )
-                
-                if youtube_result:
-                    logger.info(f"YouTube upload successful: {youtube_result['url']}")
-                else:
-                    logger.warning("YouTube upload failed")
+            youtube_result = None
+            logger.info("Step 7: Uploading to YouTube...")
+            if metadata and getattr(self, 'youtube_uploader', None):
+                try:
+                    youtube_result = self.youtube_uploader.upload_regular_video(
+                        video_path=final_video,
+                        title=metadata['youtube_title'],
+                        description=metadata['youtube_description'],
+                        tags=metadata['youtube_tags']
+                    )
+                    if youtube_result:
+                        logger.info(f"YouTube upload successful: {youtube_result.get('url')}")
+                    else:
+                        logger.warning("YouTube upload failed")
+                except Exception as e:
+                    logger.error(f"YouTube upload error: {e}")
+            else:
+                if metadata:
+                    logger.warning("YouTubeUploader not available; skipping upload")
             
             # Save session data
             self._save_session_data('video', {

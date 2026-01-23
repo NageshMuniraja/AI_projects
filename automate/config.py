@@ -16,6 +16,7 @@ class Config:
     ELEVENLABS_API_KEY = os.getenv('ELEVENLABS_API_KEY')
     ELEVENLABS_VOICE_ID = os.getenv('ELEVENLABS_VOICE_ID', 'EXAVITQu4vr4xnSDxMaL')  # Default voice
     RUNWAY_API_KEY = os.getenv('RUNWAY_API_KEY')
+    RUNWAY_API_VERSION = os.getenv('RUNWAY_API_VERSION')
     
     # YouTube Configuration
     YOUTUBE_CLIENT_ID = os.getenv('YOUTUBE_CLIENT_ID')

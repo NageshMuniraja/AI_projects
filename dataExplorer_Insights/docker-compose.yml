@@ -1,0 +1,100 @@
+version: '3.8'
+
+services:
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: datainsights-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=False
+      - HOST=0.0.0.0
+      - PORT=8000
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8000
+    volumes:
+      - ./backend:/app
+      - ./backend/logs:/app/logs
+    depends_on:
+      - redis
+    networks:
+      - datainsights-network
+    restart: unless-stopped
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: datainsights-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - backend
+    networks:
+      - datainsights-network
+    restart: unless-stopped
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    container_name: datainsights-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - datainsights-network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+  # PostgreSQL (optional - for demo/testing)
+  postgres:
+    image: postgres:16-alpine
+    container_name: datainsights-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=demo_db
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - datainsights-network
+    restart: unless-stopped
+
+  # MongoDB (optional - for demo/testing)
+  mongodb:
+    image: mongo:7
+    container_name: datainsights-mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=password
+    volumes:
+      - mongodb-data:/data/db
+    networks:
+      - datainsights-network
+    restart: unless-stopped
+
+networks:
+  datainsights-network:
+    driver: bridge
+
+volumes:
+  redis-data:
+  postgres-data:
+  mongodb-data:
