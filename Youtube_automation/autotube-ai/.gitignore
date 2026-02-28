@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Environment variables
+.env
+*.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Media files (generated)
+media/voiceovers/
+media/footage/
+media/thumbnails/
+media/final_videos/
+media/temp/
+
+# Credentials
+*.pickle
+*.token
+youtube_credentials.json
+client_secret*.json
+
+# Logs
+logs/
+*.log
+
+# Database
+*.db
+*.sqlite3
+
+# Node
+node_modules/
+frontend/dist/
+frontend/build/
+
+# Docker
+*.pyc
+
+# Alembic
+alembic/versions/__pycache__/

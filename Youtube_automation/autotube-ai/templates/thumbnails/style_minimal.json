@@ -1,0 +1,27 @@
+{
+  "name": "minimal",
+  "description": "Clean minimal design — white text, subtle gradient, premium feel",
+  "canvas": {"width": 1280, "height": 720},
+  "background": {
+    "type": "gradient",
+    "colors": ["#0f0f0f", "#2d2d2d"],
+    "direction": "vertical"
+  },
+  "text": {
+    "max_words": 3,
+    "font": "Montserrat-Bold",
+    "font_size": 96,
+    "color": "#FFFFFF",
+    "stroke_color": "#333333",
+    "stroke_width": 2,
+    "position": "center",
+    "shadow": {"offset": [2, 2], "color": "#000000", "blur": 4}
+  },
+  "overlay": {
+    "enabled": false
+  },
+  "effects": {
+    "vignette": false,
+    "saturation_boost": 1.0
+  }
+}

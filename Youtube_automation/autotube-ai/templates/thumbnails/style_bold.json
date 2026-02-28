@@ -1,0 +1,31 @@
+{
+  "name": "bold",
+  "description": "Bold text with high contrast — red/yellow text on dark backgrounds",
+  "canvas": {"width": 1280, "height": 720},
+  "background": {
+    "type": "gradient",
+    "colors": ["#1a1a2e", "#16213e"],
+    "direction": "diagonal"
+  },
+  "text": {
+    "max_words": 5,
+    "font": "Montserrat-Black",
+    "font_size": 110,
+    "color": "#FFD700",
+    "stroke_color": "#000000",
+    "stroke_width": 5,
+    "position": "center-left",
+    "shadow": {"offset": [4, 4], "color": "#000000", "blur": 8}
+  },
+  "overlay": {
+    "enabled": true,
+    "color": "#FF0000",
+    "opacity": 0.15,
+    "type": "strip",
+    "position": "bottom"
+  },
+  "effects": {
+    "vignette": true,
+    "saturation_boost": 1.2
+  }
+}

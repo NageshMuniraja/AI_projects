@@ -1,0 +1,35 @@
+{
+  "name": "shocking",
+  "description": "Clickbait style — dramatic AI image background, exclamation, urgency",
+  "canvas": {"width": 1280, "height": 720},
+  "background": {
+    "type": "ai_generated",
+    "prompt_suffix": "dramatic, cinematic lighting, dark moody atmosphere",
+    "fallback_gradient": ["#2d0a0a", "#0a0a2d"]
+  },
+  "text": {
+    "max_words": 6,
+    "font": "Montserrat-Black",
+    "font_size": 100,
+    "color": "#FF4444",
+    "stroke_color": "#FFFFFF",
+    "stroke_width": 4,
+    "position": "center",
+    "shadow": {"offset": [3, 3], "color": "#000000", "blur": 10}
+  },
+  "overlay": {
+    "enabled": true,
+    "color": "#000000",
+    "opacity": 0.4,
+    "type": "full"
+  },
+  "decorations": {
+    "arrow": {"enabled": true, "color": "#FFD700", "position": "right"},
+    "emoji": {"enabled": true, "position": "top-right"}
+  },
+  "effects": {
+    "vignette": true,
+    "saturation_boost": 1.3,
+    "blur_behind_text": true
+  }
+}
