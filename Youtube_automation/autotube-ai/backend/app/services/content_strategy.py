@@ -1,5 +1,6 @@
 """Content Strategy Service — AI-driven content planning that learns from analytics."""
 
+import re
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 
@@ -24,6 +25,8 @@ class TopicSuggestion:
     virality_score: int
     is_trending: bool
     is_evergreen: bool
+    suggested_title: str = ""
+    content_angle: str = ""
 
 
 @dataclass
@@ -42,28 +45,42 @@ class ContentStrategy:
     async def suggest_next_topics(
         self, channel_id: int, count: int = 10
     ) -> list[TopicSuggestion]:
-        """Suggest next topics based on performance data and niche."""
+        """Suggest next topics based on weighted performance data and niche."""
         async with async_session_factory() as db:
             channel = await db.get(Channel, channel_id)
             if not channel:
                 return []
 
-            # Get top performing videos (by views)
+            # Get top performing videos with WEIGHTED metrics
+            # Weight: retention 40%, CTR 30%, engagement 20%, growth 10%
             top_result = await db.execute(
                 select(
                     Video.topic,
                     Video.title,
                     func.sum(VideoAnalytics.views).label("total_views"),
+                    func.avg(VideoAnalytics.avg_view_percentage).label("avg_retention"),
+                    func.avg(VideoAnalytics.ctr).label("avg_ctr"),
+                    func.sum(VideoAnalytics.likes).label("total_likes"),
+                    func.sum(VideoAnalytics.comments).label("total_comments"),
+                    func.sum(VideoAnalytics.shares).label("total_shares"),
+                    func.sum(VideoAnalytics.subscribers_gained).label("total_subs"),
                 )
                 .join(VideoAnalytics, VideoAnalytics.video_id == Video.id)
                 .where(Video.channel_id == channel_id)
                 .group_by(Video.id, Video.topic, Video.title)
-                .order_by(func.sum(VideoAnalytics.views).desc())
+                .order_by(
+                    # Composite score: retention-heavy weighting
+                    (
+                        func.avg(VideoAnalytics.avg_view_percentage) * 0.4
+                        + func.avg(VideoAnalytics.ctr) * 3.0
+                        + func.sum(VideoAnalytics.views) * 0.00001
+                    ).desc()
+                )
                 .limit(10)
             )
             top_videos = top_result.all()
 
-            # Get recent topics (last 30 days) to avoid repetition
+            # Get recent topics (last 30 days)
             recent_result = await db.execute(
                 select(Video.topic)
                 .where(Video.channel_id == channel_id)
@@ -71,17 +88,49 @@ class ContentStrategy:
             )
             recent_topics = [r[0] for r in recent_result.all() if r[0]]
 
-        # Format data for AI prompt
+            # Get performance summary (inside same session)
+            performance_metrics = await self._get_performance_summary(db, channel_id)
+
+        # Format data with full metrics for AI prompt
         top_videos_data = "\n".join(
-            f"- '{v.title or v.topic}' — {v.total_views} views"
+            f"- '{v.title or v.topic}' — {v.total_views or 0} views, "
+            f"retention: {float(v.avg_retention or 0):.1f}%, "
+            f"CTR: {float(v.avg_ctr or 0):.1f}%, "
+            f"likes: {v.total_likes or 0}, comments: {v.total_comments or 0}, "
+            f"shares: {v.total_shares or 0}, subs gained: {v.total_subs or 0}"
             for v in top_videos
         ) or "No published videos yet"
 
         recent_str = "\n".join(f"- {t}" for t in recent_topics) or "None"
 
         return self._generate_suggestions(
-            channel.niche, top_videos_data, recent_str, count
+            channel.niche, top_videos_data, recent_str, count, performance_metrics
         )
+
+    async def _get_performance_summary(self, db, channel_id: int) -> str:
+        """Generate a performance summary for the AI prompt."""
+        try:
+            result = await db.execute(
+                select(
+                    func.avg(VideoAnalytics.avg_view_percentage).label("avg_ret"),
+                    func.avg(VideoAnalytics.ctr).label("avg_ctr"),
+                    func.sum(VideoAnalytics.views).label("total_views"),
+                    func.count(Video.id.distinct()).label("total_videos"),
+                )
+                .join(Video, Video.id == VideoAnalytics.video_id)
+                .where(Video.channel_id == channel_id)
+            )
+            row = result.one()
+
+            return (
+                f"Channel averages: "
+                f"retention {float(row.avg_ret or 0):.1f}%, "
+                f"CTR {float(row.avg_ctr or 0):.1f}%, "
+                f"total views {int(row.total_views or 0):,}, "
+                f"total videos {int(row.total_videos or 0)}"
+            )
+        except Exception:
+            return "No performance data available yet"
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=2, min=4, max=30))
     def _generate_suggestions(
@@ -90,12 +139,14 @@ class ContentStrategy:
         top_videos_data: str,
         recent_topics: str,
         count: int,
+        performance_metrics: str = "",
     ) -> list[TopicSuggestion]:
-        """Use Claude to generate topic suggestions."""
+        """Use Claude to generate topic suggestions with weighted metrics."""
         prompt = CONTENT_STRATEGY_PROMPT.format(
             niche=niche,
             top_videos_data=top_videos_data,
             recent_topics=recent_topics,
+            performance_metrics=performance_metrics or "No data available yet",
         )
 
         response = self.claude.messages.create(
@@ -112,13 +163,14 @@ class ContentStrategy:
         """Parse AI response into TopicSuggestion objects."""
         suggestions = []
 
-        # Try to parse structured output
         lines = text.strip().split("\n")
         current_topic = None
         current_reasoning = ""
         current_score = 50
         current_trending = False
         current_evergreen = False
+        current_title = ""
+        current_angle = ""
 
         for line in lines:
             line = line.strip()
@@ -130,17 +182,19 @@ class ContentStrategy:
                         virality_score=current_score,
                         is_trending=current_trending,
                         is_evergreen=current_evergreen,
+                        suggested_title=current_title,
+                        content_angle=current_angle,
                     ))
                     current_topic = None
                     current_reasoning = ""
                     current_score = 50
                     current_trending = False
                     current_evergreen = False
+                    current_title = ""
+                    current_angle = ""
                 continue
 
-            # Detect topic line (numbered or starts with title-like pattern)
-            import re
-            topic_match = re.match(r"^\d+[\.\)]\s*(.+)", line)
+            topic_match = re.match(r"^\*?\*?\d+[\.\)]\s*\*?\*?\s*(.+)", line)
             if topic_match:
                 if current_topic:
                     suggestions.append(TopicSuggestion(
@@ -149,27 +203,41 @@ class ContentStrategy:
                         virality_score=current_score,
                         is_trending=current_trending,
                         is_evergreen=current_evergreen,
+                        suggested_title=current_title,
+                        content_angle=current_angle,
                     ))
                 current_topic = topic_match.group(1).strip().strip('"').strip("*")
                 current_reasoning = ""
                 current_score = 50
+                current_trending = False
+                current_evergreen = False
+                current_title = ""
+                current_angle = ""
                 continue
 
-            # Detect score
-            score_match = re.search(r"score[:\s]*(\d+)", line, re.IGNORECASE)
+            score_match = re.search(r"(?:score|virality)[:\s]*(\d+)", line, re.IGNORECASE)
             if score_match:
                 current_score = min(100, max(0, int(score_match.group(1))))
 
-            # Detect trending/evergreen
             if "trending" in line.lower():
                 current_trending = True
             if "evergreen" in line.lower():
                 current_evergreen = True
+            if "hybrid" in line.lower():
+                current_trending = True
+                current_evergreen = True
+
+            title_match = re.search(r"(?:suggested title|title pattern)[:\s]*[\"'](.+?)[\"']", line, re.IGNORECASE)
+            if title_match:
+                current_title = title_match.group(1)
+
+            angle_match = re.search(r"(?:content angle|angle)[:\s]*(.+)", line, re.IGNORECASE)
+            if angle_match:
+                current_angle = angle_match.group(1).strip()
 
             if current_topic:
                 current_reasoning += line + " "
 
-        # Don't forget the last one
         if current_topic:
             suggestions.append(TopicSuggestion(
                 title=current_topic,
@@ -177,6 +245,8 @@ class ContentStrategy:
                 virality_score=current_score,
                 is_trending=current_trending,
                 is_evergreen=current_evergreen,
+                suggested_title=current_title,
+                content_angle=current_angle,
             ))
 
         return suggestions
@@ -191,7 +261,6 @@ class ContentStrategy:
             channel = await db.get(Channel, channel_id)
             frequency = channel.posting_frequency if channel else "3x_week"
 
-        # Determine posting days
         if frequency == "daily":
             posts_per_week = 7
         elif frequency == "3x_week":
@@ -222,7 +291,6 @@ class ContentStrategy:
                 calendar_entries.append(entry)
                 suggestion_idx += 1
 
-        # Save to DB
         async with async_session_factory() as db:
             for entry in calendar_entries:
                 cal = ContentCalendar(
@@ -241,12 +309,11 @@ class ContentStrategy:
         return calendar_entries
 
     def get_optimal_post_times(self, niche: str) -> list[TimeSlot]:
-        """Return optimal posting times based on niche (static defaults for now)."""
-        # Data-backed defaults for YouTube posting (EST/PST prime time)
+        """Return optimal posting times based on niche."""
         return [
-            TimeSlot(day_of_week=0, hour=14, estimated_views_multiplier=1.1),  # Monday 2PM
-            TimeSlot(day_of_week=2, hour=15, estimated_views_multiplier=1.2),  # Wednesday 3PM
-            TimeSlot(day_of_week=4, hour=14, estimated_views_multiplier=1.15),  # Friday 2PM
-            TimeSlot(day_of_week=5, hour=10, estimated_views_multiplier=1.3),  # Saturday 10AM
-            TimeSlot(day_of_week=6, hour=10, estimated_views_multiplier=1.25),  # Sunday 10AM
+            TimeSlot(day_of_week=0, hour=14, estimated_views_multiplier=1.1),
+            TimeSlot(day_of_week=2, hour=15, estimated_views_multiplier=1.2),
+            TimeSlot(day_of_week=4, hour=14, estimated_views_multiplier=1.15),
+            TimeSlot(day_of_week=5, hour=10, estimated_views_multiplier=1.3),
+            TimeSlot(day_of_week=6, hour=10, estimated_views_multiplier=1.25),
         ]

@@ -39,38 +39,40 @@ class SEOOptimizer:
         script: str,
         niche: str,
         target_audience: str = "general audience",
+        duration_minutes: int = 10,
     ) -> VideoMetadata:
         """Generate fully optimized video metadata."""
         metadata = VideoMetadata()
         total_cost = 0.0
 
-        # Generate titles
+        # Generate titles (now 10 variants)
         titles, cost = self._generate_titles(topic, niche, target_audience)
         metadata.titles = titles
         metadata.selected_title = titles[0] if titles else topic[:60]
         total_cost += cost
 
-        # Generate description
+        # Generate description with timestamps
         desc, cost = self._generate_description(
-            metadata.selected_title, topic, script
+            metadata.selected_title, topic, script, niche, duration_minutes
         )
         metadata.description = desc
         total_cost += cost
 
         # Generate tags
-        tags, cost = self._generate_tags(topic, niche)
+        tags, cost = self._generate_tags(topic, niche, metadata.selected_title)
         metadata.tags = tags
         total_cost += cost
 
-        # Generate hashtags (top 3 from tags)
-        metadata.hashtags = [f"#{t.replace(' ', '')}" for t in tags[:3]]
+        # Extract hashtags from description or generate from top tags
+        metadata.hashtags = self._extract_hashtags(desc, tags)
 
         # Set category based on niche
         metadata.category_id = self._niche_to_category(niche)
         metadata.cost_usd = total_cost
 
         logger.info(f"SEO optimized: '{metadata.selected_title}', "
-                     f"{len(tags)} tags, ${total_cost:.4f}")
+                     f"{len(titles)} title variants, {len(tags)} tags, "
+                     f"{len(metadata.hashtags)} hashtags, ${total_cost:.4f}")
 
         return metadata
 
@@ -78,14 +80,15 @@ class SEOOptimizer:
     def _generate_titles(
         self, topic: str, niche: str, target_audience: str
     ) -> tuple[list[str], float]:
-        """Generate ranked title options."""
+        """Generate 10 ranked title options with CTR reasoning."""
         prompt = SEO_TITLE_PROMPT.format(
-            topic=topic, niche=niche, target_audience=target_audience
+            topic=topic, niche=niche, target_audience=target_audience,
+            current_year="2026",
         )
 
         response = self.client.messages.create(
             model=self.model,
-            max_tokens=512,
+            max_tokens=1024,
             messages=[{"role": "user", "content": prompt}],
         )
 
@@ -95,26 +98,29 @@ class SEOOptimizer:
             + (response.usage.output_tokens / 1_000_000) * self.OUTPUT_COST_PER_M
         )
 
-        # Parse numbered list
+        # Parse numbered list — strip reasoning in parentheses for clean titles
         titles = []
         for line in text.strip().split("\n"):
             cleaned = re.sub(r"^\d+[\.\)]\s*", "", line.strip())
+            # Remove trailing parenthetical reasoning
+            cleaned = re.sub(r"\s*\(.*?\)\s*$", "", cleaned)
             cleaned = cleaned.strip('"').strip("'").strip()
             if cleaned and len(cleaned) <= 100:
                 titles.append(cleaned)
 
-        return titles[:5], cost
+        return titles[:10], cost
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=2, min=4, max=30))
     def _generate_description(
-        self, title: str, topic: str, script: str
+        self, title: str, topic: str, script: str, niche: str,
+        duration_minutes: int = 10,
     ) -> tuple[str, float]:
-        """Generate an SEO-optimized description."""
-        # Truncate script to avoid huge prompts
+        """Generate an SEO-optimized description with timestamps and hashtags."""
         script_excerpt = script[:2000] if len(script) > 2000 else script
 
         prompt = SEO_DESCRIPTION_PROMPT.format(
-            title=title, topic=topic
+            title=title, topic=topic, niche=niche,
+            duration_minutes=duration_minutes,
         ) + f"\n\nScript excerpt for context:\n{script_excerpt}"
 
         response = self.client.messages.create(
@@ -131,9 +137,9 @@ class SEOOptimizer:
         return response.content[0].text.strip(), cost
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=2, min=4, max=30))
-    def _generate_tags(self, topic: str, niche: str) -> tuple[list[str], float]:
+    def _generate_tags(self, topic: str, niche: str, title: str) -> tuple[list[str], float]:
         """Generate 30 relevant tags."""
-        prompt = SEO_TAGS_PROMPT.format(topic=topic, niche=niche)
+        prompt = SEO_TAGS_PROMPT.format(topic=topic, niche=niche, title=title)
 
         response = self.client.messages.create(
             model=self.model,
@@ -151,6 +157,17 @@ class SEOOptimizer:
         tags = [t for t in tags if t and len(t) <= 30]
 
         return tags[:30], cost
+
+    @staticmethod
+    def _extract_hashtags(description: str, tags: list[str]) -> list[str]:
+        """Extract hashtags from description or generate from top tags."""
+        # Try to find hashtags in the description
+        hashtags = re.findall(r"#\w+", description)
+        if hashtags:
+            return hashtags[:3]
+
+        # Fallback: generate from top 3 tags
+        return [f"#{t.replace(' ', '')}" for t in tags[:3]]
 
     @staticmethod
     def _niche_to_category(niche: str) -> str:

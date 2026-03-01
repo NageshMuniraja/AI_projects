@@ -1,7 +1,8 @@
-"""YouTube Analytics Service — pulls performance data for published videos."""
+"""YouTube Analytics Service — pulls full performance data for published videos."""
 
 from datetime import date, timedelta
 from dataclasses import dataclass
+from decimal import Decimal
 
 from loguru import logger
 from sqlalchemy import select
@@ -16,7 +17,7 @@ from app.utils.youtube_auth import build_youtube_client
 
 
 class YouTubeAnalyticsService:
-    """Pull analytics from YouTube and store in the database."""
+    """Pull comprehensive analytics from YouTube and store in the database."""
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=5, min=10, max=60))
     def pull_video_analytics(
@@ -24,9 +25,10 @@ class YouTubeAnalyticsService:
         encrypted_credentials: str,
         youtube_video_id: str,
     ) -> dict:
-        """Pull analytics for a single video from YouTube API."""
-        youtube, _ = build_youtube_client(encrypted_credentials)
+        """Pull full analytics for a single video from YouTube API."""
+        youtube, credentials = build_youtube_client(encrypted_credentials)
 
+        # Basic statistics from YouTube Data API
         response = youtube.videos().list(
             part="statistics,snippet",
             id=youtube_video_id,
@@ -37,12 +39,95 @@ class YouTubeAnalyticsService:
             return {}
 
         stats = items[0].get("statistics", {})
-        return {
+        result = {
             "views": int(stats.get("viewCount", 0)),
             "likes": int(stats.get("likeCount", 0)),
             "dislikes": int(stats.get("dislikeCount", 0)),
             "comments": int(stats.get("commentCount", 0)),
         }
+
+        # Try to get extended analytics from YouTube Analytics API
+        try:
+            extended = self._pull_extended_analytics(
+                credentials, youtube_video_id
+            )
+            result.update(extended)
+        except Exception as e:
+            logger.debug(f"Extended analytics unavailable for {youtube_video_id}: {e}")
+
+        return result
+
+    def _pull_extended_analytics(
+        self, credentials, youtube_video_id: str
+    ) -> dict:
+        """Pull extended metrics from YouTube Analytics API."""
+        from googleapiclient.discovery import build
+
+        analytics = build("youtubeAnalytics", "v2", credentials=credentials)
+
+        today = date.today()
+        start_date = (today - timedelta(days=7)).isoformat()
+        end_date = today.isoformat()
+
+        response = analytics.reports().query(
+            ids="channel==MINE",
+            startDate=start_date,
+            endDate=end_date,
+            metrics=(
+                "estimatedMinutesWatched,averageViewDuration,"
+                "averageViewPercentage,annotationClickThroughRate,"
+                "subscribersGained,shares,estimatedRevenue,"
+                "impressions,impressionClickThroughRate"
+            ),
+            filters=f"video=={youtube_video_id}",
+        ).execute()
+
+        rows = response.get("rows", [])
+        if not rows:
+            return {}
+
+        row = rows[0]
+        return {
+            "watch_time_hours": round(float(row[0]) / 60, 2),  # minutes → hours
+            "avg_view_duration": float(row[1]),
+            "avg_view_percentage": float(row[2]),
+            "ctr": float(row[4]) if len(row) > 4 else 0,
+            "subscribers_gained": int(row[5]) if len(row) > 5 else 0,
+            "shares": int(row[6]) if len(row) > 6 else 0,
+            "estimated_revenue": float(row[7]) if len(row) > 7 else 0,
+            "impressions": int(row[8]) if len(row) > 8 else 0,
+        }
+
+    def _pull_traffic_sources(
+        self, credentials, youtube_video_id: str
+    ) -> dict:
+        """Pull traffic source breakdown from YouTube Analytics API."""
+        from googleapiclient.discovery import build
+
+        analytics = build("youtubeAnalytics", "v2", credentials=credentials)
+
+        today = date.today()
+        start_date = (today - timedelta(days=28)).isoformat()
+        end_date = today.isoformat()
+
+        try:
+            response = analytics.reports().query(
+                ids="channel==MINE",
+                startDate=start_date,
+                endDate=end_date,
+                metrics="views",
+                dimensions="insightTrafficSourceType",
+                filters=f"video=={youtube_video_id}",
+                sort="-views",
+            ).execute()
+
+            sources = {}
+            for row in response.get("rows", []):
+                sources[row[0]] = int(row[1])
+            return sources
+        except Exception as e:
+            logger.debug(f"Traffic sources unavailable: {e}")
+            return {}
 
     async def pull_channel_analytics(self, channel_id: int) -> int:
         """Pull analytics for all published videos in a channel. Returns count updated."""
@@ -85,6 +170,14 @@ class YouTubeAnalyticsService:
                         analytics.likes = stats["likes"]
                         analytics.dislikes = stats["dislikes"]
                         analytics.comments = stats["comments"]
+                        analytics.shares = stats.get("shares", 0)
+                        analytics.watch_time_hours = Decimal(str(stats.get("watch_time_hours", 0)))
+                        analytics.avg_view_duration = Decimal(str(stats.get("avg_view_duration", 0)))
+                        analytics.avg_view_percentage = Decimal(str(stats.get("avg_view_percentage", 0)))
+                        analytics.ctr = Decimal(str(stats.get("ctr", 0)))
+                        analytics.impressions = stats.get("impressions", 0)
+                        analytics.subscribers_gained = stats.get("subscribers_gained", 0)
+                        analytics.estimated_revenue = Decimal(str(stats.get("estimated_revenue", 0)))
                     else:
                         analytics = VideoAnalytics(
                             video_id=video.id,
@@ -93,8 +186,26 @@ class YouTubeAnalyticsService:
                             likes=stats["likes"],
                             dislikes=stats["dislikes"],
                             comments=stats["comments"],
+                            shares=stats.get("shares", 0),
+                            watch_time_hours=Decimal(str(stats.get("watch_time_hours", 0))),
+                            avg_view_duration=Decimal(str(stats.get("avg_view_duration", 0))),
+                            avg_view_percentage=Decimal(str(stats.get("avg_view_percentage", 0))),
+                            ctr=Decimal(str(stats.get("ctr", 0))),
+                            impressions=stats.get("impressions", 0),
+                            subscribers_gained=stats.get("subscribers_gained", 0),
+                            estimated_revenue=Decimal(str(stats.get("estimated_revenue", 0))),
                         )
                         db.add(analytics)
+
+                    # Try to pull traffic sources
+                    try:
+                        from app.utils.youtube_auth import build_youtube_client
+                        _, credentials = build_youtube_client(channel.oauth_credentials_encrypted)
+                        traffic = self._pull_traffic_sources(credentials, video.youtube_video_id)
+                        if traffic:
+                            analytics.traffic_sources = traffic
+                    except Exception:
+                        pass
 
                     updated += 1
                 except Exception as e:
