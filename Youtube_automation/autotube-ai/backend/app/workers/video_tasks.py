@@ -67,6 +67,64 @@ def resume_pipeline_task(self, video_id: int):
         raise self.retry(exc=exc)
 
 
+@celery_app.task(bind=True, max_retries=1, default_retry_delay=60)
+def run_kids_short_task(self, topic: str, channel_id: int | None = None):
+    """Generate a standalone kids-focused YouTube Short."""
+    from app.services.shorts_generator import ShortsGenerator
+
+    logger.info(f"Celery task: kids_short for topic '{topic}'")
+
+    try:
+        generator = ShortsGenerator()
+        result = generator.generate_kids_short(topic=topic, voice_id="nova")
+
+        if not result:
+            raise RuntimeError("Kids Short generation returned None")
+
+        logger.info(
+            f"Kids Short completed: {result.video_path} "
+            f"({result.duration_seconds:.1f}s), cost=${result.cost_usd:.4f}"
+        )
+
+        # Upload if channel credentials available
+        if channel_id:
+            _run_async(_upload_kids_short(channel_id, result))
+
+        return {
+            "success": True,
+            "video_path": result.video_path,
+            "duration": result.duration_seconds,
+            "cost": result.cost_usd,
+        }
+    except Exception as exc:
+        logger.error(f"Kids Short task error: {exc}")
+        raise self.retry(exc=exc)
+
+
+async def _upload_kids_short(channel_id: int, result):
+    """Upload kids Short to YouTube if channel has OAuth credentials."""
+    from app.database import async_session_factory
+    from app.models.channel import Channel
+
+    async with async_session_factory() as db:
+        channel = await db.get(Channel, channel_id)
+        if channel and channel.oauth_credentials_encrypted:
+            try:
+                from app.services.youtube_uploader import YouTubeUploader
+                uploader = YouTubeUploader(channel.oauth_credentials_encrypted)
+                upload_result = uploader.upload_video(
+                    video_path=result.video_path,
+                    title=f"{result.hook_text} #shorts #kids #fun",
+                    description="Amazing fun facts for kids! Like and subscribe for more!\n#shorts #kids #funfacts #amazing",
+                    tags=["shorts", "kids", "fun facts", "amazing", "education", "children"],
+                    category_id="22",
+                    privacy_status="public",
+                )
+                logger.info(f"Kids Short uploaded: youtube.com/shorts/{upload_result.video_id}")
+            except Exception as e:
+                logger.warning(f"Kids Short upload failed: {e}")
+
+
 @celery_app.task(bind=True, max_retries=1, default_retry_delay=120)
 def run_batch_pipeline_task(self, channel_id: int, count: int = 5):
     """Run pipeline for multiple videos by dispatching individual tasks."""

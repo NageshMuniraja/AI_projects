@@ -172,9 +172,10 @@ class VideoAssembler:
             codec="libx264",
             audio_codec="aac",
             bitrate=settings.DEFAULT_VIDEO_BITRATE,
-            preset="medium",
+            preset="fast",
             threads=4,
             logger=None,
+            ffmpeg_params=["-movflags", "+faststart", "-crf", "23"],
         )
 
         duration = final_video.duration
@@ -244,22 +245,29 @@ class VideoAssembler:
                 clip = clip.with_duration(total_duration)
             return clip
 
-        # Apply crossfade: stagger clips with overlap, apply fade in/out
+        # Apply crossfade: stagger clips with overlap, use opacity-based fading
         composed_clips = []
         current_time = 0.0
 
         for i, clip in enumerate(raw_clips):
-            # Fade in (except first clip)
-            if i > 0:
-                clip = clip.with_effects([
-                    lambda c, dur=CROSSFADE_DURATION: c.crossfadein(dur)
-                ]) if hasattr(clip, 'crossfadein') else clip
+            fade_in = i > 0
+            fade_out = i < len(raw_clips) - 1
+            clip_dur = clip.duration
 
-            # Fade out (except last clip)
-            if i < len(raw_clips) - 1:
-                clip = clip.with_effects([
-                    lambda c, dur=CROSSFADE_DURATION: c.crossfadeout(dur)
-                ]) if hasattr(clip, 'crossfadeout') else clip
+            # Apply opacity-based fade in/out via transform
+            if fade_in or fade_out:
+                def make_fade(get_frame, t, d=clip_dur, fi=fade_in, fo=fade_out):
+                    frame = get_frame(t)
+                    alpha = 1.0
+                    if fi and t < CROSSFADE_DURATION:
+                        alpha = t / CROSSFADE_DURATION
+                    if fo and t > d - CROSSFADE_DURATION:
+                        alpha = min(alpha, (d - t) / CROSSFADE_DURATION)
+                    if alpha < 1.0:
+                        frame = (frame * alpha).astype(np.uint8)
+                    return frame
+
+                clip = clip.transform(make_fade)
 
             clip = clip.with_start(current_time)
             composed_clips.append(clip)

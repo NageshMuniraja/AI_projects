@@ -98,14 +98,20 @@ class SEOOptimizer:
             + (response.usage.output_tokens / 1_000_000) * self.OUTPUT_COST_PER_M
         )
 
-        # Parse numbered list — strip reasoning in parentheses for clean titles
+        # Parse numbered list — only lines starting with a number
         titles = []
         for line in text.strip().split("\n"):
-            cleaned = re.sub(r"^\d+[\.\)]\s*", "", line.strip())
+            line = line.strip()
+            # Must start with a number (1. or 1) etc.)
+            if not re.match(r"^\d+[\.\)]\s", line):
+                continue
+            cleaned = re.sub(r"^\d+[\.\)]\s*", "", line)
             # Remove trailing parenthetical reasoning
             cleaned = re.sub(r"\s*\(.*?\)\s*$", "", cleaned)
+            # Remove markdown bold
+            cleaned = re.sub(r"\*\*", "", cleaned)
             cleaned = cleaned.strip('"').strip("'").strip()
-            if cleaned and len(cleaned) <= 100:
+            if cleaned and 10 <= len(cleaned) <= 100:
                 titles.append(cleaned)
 
         return titles[:10], cost

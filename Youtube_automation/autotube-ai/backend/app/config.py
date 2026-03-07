@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str = ""
     STABILITY_API_KEY: str = ""
     ELEVENLABS_API_KEY: str = ""
+    ELEVENLABS_VOICE_ID: str = ""
     OPENAI_API_KEY: str = ""
 
     # --- Stock Media ---
@@ -36,6 +37,7 @@ class Settings(BaseSettings):
     # --- YouTube ---
     YOUTUBE_CLIENT_ID: str = ""
     YOUTUBE_CLIENT_SECRET: str = ""
+    YOUTUBE_REFRESH_TOKEN: str = ""
     YOUTUBE_REDIRECT_URI: str = "http://localhost:8000/api/auth/youtube/callback"
 
     # --- Video Defaults ---
@@ -44,7 +46,7 @@ class Settings(BaseSettings):
     DEFAULT_VIDEO_RESOLUTION: str = "1080p"
     DEFAULT_CAPTION_STYLE: str = "hormozi"
     DEFAULT_FPS: int = 30
-    DEFAULT_VIDEO_BITRATE: str = "10M"
+    DEFAULT_VIDEO_BITRATE: str = "5M"
 
     # --- Derived paths ---
     @property

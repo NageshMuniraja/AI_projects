@@ -24,4 +24,8 @@ celery_app.conf.update(
 from app.services.scheduler_service import BEAT_SCHEDULE
 celery_app.conf.beat_schedule = BEAT_SCHEDULE
 
-celery_app.autodiscover_tasks(["app.workers"])
+# Explicitly include task modules (autodiscover only finds "tasks.py")
+celery_app.conf.include = [
+    "app.workers.video_tasks",
+    "app.workers.analytics_tasks",
+]

@@ -1,4 +1,11 @@
-"""Video Pipeline Orchestrator — end-to-end video creation from topic to uploaded video."""
+"""Video Pipeline Orchestrator — end-to-end video creation from topic to uploaded video.
+
+Optimized for:
+- Zero TTS cost (Edge-TTS by default)
+- 5-7 min videos (retention sweet spot + monetizable)
+- Auto YouTube Shorts generation
+- Public upload by default
+"""
 
 from dataclasses import dataclass
 from decimal import Decimal
@@ -15,6 +22,7 @@ from app.services.asset_collector import AssetCollector
 from app.services.caption_generator import CaptionGenerator
 from app.services.script_generator import ScriptGenerator
 from app.services.seo_optimizer import SEOOptimizer
+from app.services.shorts_generator import ShortsGenerator
 from app.services.thumbnail_generator import ThumbnailGenerator
 from app.services.video_assembler import AssembledVideo, VideoAssembler, VideoComponents
 from app.services.voiceover_generator import VoiceoverGenerator
@@ -30,8 +38,9 @@ class PipelineStep(IntEnum):
     THUMBNAIL = 7
     ASSEMBLE = 8
     SEO = 9
-    UPLOAD = 10
-    TRACK = 11
+    SHORTS = 10
+    UPLOAD = 11
+    TRACK = 12
 
 
 STEP_TO_STATUS = {
@@ -44,6 +53,7 @@ STEP_TO_STATUS = {
     PipelineStep.THUMBNAIL: VideoStatus.GENERATING_THUMBNAIL,
     PipelineStep.ASSEMBLE: VideoStatus.ASSEMBLING,
     PipelineStep.SEO: VideoStatus.OPTIMIZING_SEO,
+    PipelineStep.SHORTS: VideoStatus.ASSEMBLING,
     PipelineStep.UPLOAD: VideoStatus.UPLOADING,
     PipelineStep.TRACK: VideoStatus.PUBLISHED,
 }
@@ -57,6 +67,9 @@ class PipelineResult:
     error: str | None = None
     video_path: str | None = None
     thumbnail_path: str | None = None
+    shorts_path: str | None = None
+    youtube_video_id: str | None = None
+    youtube_shorts_id: str | None = None
 
 
 class VideoPipeline:
@@ -71,6 +84,7 @@ class VideoPipeline:
         self.caption_gen = CaptionGenerator()
         self.thumbnail_gen = ThumbnailGenerator()
         self.video_assembler = VideoAssembler()
+        self.shorts_gen = ShortsGenerator()
         self.seo_optimizer = None
         try:
             self.seo_optimizer = SEOOptimizer()
@@ -96,8 +110,9 @@ class VideoPipeline:
                 return PipelineResult(video_id=video_id, success=False, final_step=0,
                                       error="No topic specified")
 
-            # Load channel info
-            channel = video.channel
+            # Load channel info (explicit query — async can't lazy-load)
+            from app.models.channel import Channel
+            channel = await db.get(Channel, video.channel_id)
             niche = channel.niche if channel else "general"
             channel_name = channel.name if channel else "AutoTube AI"
             caption_style = channel.caption_style if channel else "hormozi"
@@ -106,20 +121,23 @@ class VideoPipeline:
             start_step = video.pipeline_step + 1 if video.pipeline_step > 0 else PipelineStep.SCRIPT
             total_cost = Decimal(str(video.api_cost or 0))
 
-            # Variables that may be set in earlier steps and needed later
+            # Variables that persist across steps
             caption_result = None
+            shorts_path = None
+            shorts_video_id = None
 
             logger.info(f"Pipeline started for video {video_id}: '{video.topic}' "
                         f"(starting at step {start_step})")
 
             try:
-                # === STEP 3: SCRIPT GENERATION ===
+                # === STEP 3: SCRIPT GENERATION (5-7 min sweet spot) ===
                 if start_step <= PipelineStep.SCRIPT:
                     await self._update_status(db, video, PipelineStep.SCRIPT)
 
                     script = self.script_gen.generate_script(
                         topic=video.topic,
                         niche=niche,
+                        duration_minutes=6,
                     )
                     video.script_text = script.text
                     video.word_count = script.word_count
@@ -129,9 +147,9 @@ class VideoPipeline:
                     await db.commit()
 
                     logger.info(f"Step 3 (Script): {script.word_count} words, "
-                                f"~{script.estimated_duration_seconds}s")
+                                f"~{script.estimated_duration_seconds}s, ${script.cost_usd:.4f}")
 
-                # === STEP 4: VOICEOVER ===
+                # === STEP 4: VOICEOVER (OpenAI TTS primary, Edge-TTS fallback) ===
                 if start_step <= PipelineStep.VOICE:
                     await self._update_status(db, video, PipelineStep.VOICE)
 
@@ -139,18 +157,19 @@ class VideoPipeline:
                     vo_result = self.voiceover_gen.generate_voiceover(
                         script=clean_script,
                         voice_id=voice_id,
+                        provider="openai",
+                        speed=1.05,
                     )
                     video.voiceover_path = vo_result.audio_path
                     video.duration_seconds = int(vo_result.duration_seconds)
                     total_cost += Decimal(str(vo_result.cost_usd))
                     video.api_cost = total_cost
 
-                    # Normalize audio
                     self.voiceover_gen.normalize_audio(vo_result.audio_path)
                     await db.commit()
 
                     logger.info(f"Step 4 (Voice): {vo_result.duration_seconds:.1f}s, "
-                                f"provider={vo_result.provider}")
+                                f"provider={vo_result.provider}, cost=${vo_result.cost_usd:.4f}")
 
                 # === STEP 5: ASSET COLLECTION ===
                 if start_step <= PipelineStep.ASSETS:
@@ -176,7 +195,7 @@ class VideoPipeline:
                     video.api_cost = total_cost
                     await db.commit()
 
-                    logger.info(f"Step 5 (Assets): {len(collection.assets)} assets collected")
+                    logger.info(f"Step 5 (Assets): {len(collection.assets)} assets")
 
                 # === STEP 6: CAPTION GENERATION ===
                 if start_step <= PipelineStep.CAPTIONS:
@@ -187,8 +206,7 @@ class VideoPipeline:
                     )
                     await db.commit()
 
-                    logger.info(f"Step 6 (Captions): {len(caption_result.entries)} entries, "
-                                f"provider={caption_result.provider}")
+                    logger.info(f"Step 6 (Captions): {len(caption_result.entries)} entries")
 
                 # === STEP 7: THUMBNAIL ===
                 if start_step <= PipelineStep.THUMBNAIL:
@@ -208,7 +226,6 @@ class VideoPipeline:
                 if start_step <= PipelineStep.ASSEMBLE:
                     await self._update_status(db, video, PipelineStep.ASSEMBLE)
 
-                    # Gather asset paths from DB
                     assets_result = await db.execute(
                         select(Asset).where(Asset.video_id == video.id)
                     )
@@ -216,7 +233,6 @@ class VideoPipeline:
                     asset_paths = [a.local_path for a in db_assets if a.local_path]
                     asset_types = [a.type.value for a in db_assets if a.local_path]
 
-                    # Get caption entries
                     caption_result_entries = []
                     if caption_result and hasattr(caption_result, "entries"):
                         caption_result_entries = caption_result.entries
@@ -242,7 +258,7 @@ class VideoPipeline:
                     await self._update_status(db, video, PipelineStep.SEO)
 
                     if self.seo_optimizer:
-                        duration_min = (video.duration_seconds or 600) // 60
+                        duration_min = (video.duration_seconds or 360) // 60
                         metadata = self.seo_optimizer.optimize_metadata(
                             topic=video.topic,
                             script=video.script_text or "",
@@ -257,13 +273,40 @@ class VideoPipeline:
                         await db.commit()
 
                         logger.info(f"Step 9 (SEO): '{metadata.selected_title}', "
-                                    f"{len(metadata.tags)} tags, ${metadata.cost_usd:.4f}")
+                                    f"{len(metadata.tags)} tags")
                     else:
                         video.title = video.topic[:100]
                         await db.commit()
                         logger.info("Step 9 (SEO): skipped (no API key)")
 
-                # === STEP 10: YOUTUBE UPLOAD ===
+                # === STEP 10: YOUTUBE SHORTS ===
+                if start_step <= PipelineStep.SHORTS:
+                    await self._update_status(db, video, PipelineStep.SHORTS)
+
+                    if video.final_video_path and video.script_text:
+                        try:
+                            short_result = self.shorts_gen.generate_short(
+                                video_path=video.final_video_path,
+                                script_text=video.script_text,
+                                voiceover_path=video.voiceover_path,
+                                video_duration=video.duration_seconds or 360,
+                                caption_entries=caption_result.entries if caption_result and hasattr(caption_result, "entries") else None,
+                            )
+                            if short_result:
+                                shorts_path = short_result.video_path
+                                total_cost += Decimal(str(short_result.cost_usd))
+                                video.api_cost = total_cost
+                                await db.commit()
+                                logger.info(f"Step 10 (Short): {short_result.duration_seconds:.1f}s, "
+                                            f"hook='{short_result.hook_text}'")
+                            else:
+                                logger.warning("Step 10 (Short): generation returned None")
+                        except Exception as short_err:
+                            logger.warning(f"Step 10 (Short) failed: {short_err}")
+                    else:
+                        logger.warning("Step 10 (Short): no video/script available")
+
+                # === STEP 11: YOUTUBE UPLOAD (PUBLIC) ===
                 if start_step <= PipelineStep.UPLOAD:
                     await self._update_status(db, video, PipelineStep.UPLOAD)
 
@@ -272,12 +315,14 @@ class VideoPipeline:
                             from app.services.youtube_uploader import YouTubeUploader
                             uploader = YouTubeUploader(channel.oauth_credentials_encrypted)
 
+                            # Upload main video as PUBLIC
                             upload_result = uploader.upload_video(
                                 video_path=video.final_video_path,
                                 title=video.title or video.topic[:100],
                                 description=video.description or "",
                                 tags=video.tags or [],
-                                category_id="22",
+                                category_id="28" if niche == "technology" else "22",
+                                privacy_status="public",
                                 thumbnail_path=video.thumbnail_path,
                             )
 
@@ -285,25 +330,49 @@ class VideoPipeline:
                             video.api_cost = total_cost
                             await db.commit()
 
-                            logger.info(f"Step 10 (Upload): youtube.com/watch?v={upload_result.video_id}")
-                        except Exception as upload_err:
-                            logger.warning(f"Step 10 (Upload) failed: {upload_err} — "
-                                          "video saved locally, upload can be retried")
-                    else:
-                        logger.info("Step 10 (Upload): skipped (no OAuth credentials)")
+                            logger.info(f"Step 11 (Upload): youtube.com/watch?v={upload_result.video_id} [PUBLIC]")
 
-                # === STEP 11: TRACK ===
+                            # Upload Short
+                            if shorts_path:
+                                try:
+                                    short_title = f"{(video.title or video.topic)[:55]} #shorts"
+                                    short_desc = (
+                                        f"{(video.description or '')[:200]}\n\n"
+                                        f"Full video: https://youtube.com/watch?v={upload_result.video_id}\n"
+                                        f"#shorts #{niche.replace(' ', '')}"
+                                    )
+                                    short_tags = (video.tags or [])[:8] + ["shorts", "short", niche]
+                                    short_upload = uploader.upload_video(
+                                        video_path=shorts_path,
+                                        title=short_title[:100],
+                                        description=short_desc[:5000],
+                                        tags=short_tags,
+                                        category_id="28" if niche == "technology" else "22",
+                                        privacy_status="public",
+                                    )
+                                    shorts_video_id = short_upload.video_id
+                                    logger.info(f"Step 11 (Short Upload): youtube.com/shorts/{short_upload.video_id}")
+                                except Exception as se:
+                                    logger.warning(f"Short upload failed: {se}")
+
+                        except Exception as upload_err:
+                            logger.warning(f"Step 11 (Upload) failed: {upload_err}")
+                    else:
+                        reason = "no OAuth" if not (channel and channel.oauth_credentials_encrypted) else "no video"
+                        logger.info(f"Step 11 (Upload): skipped ({reason})")
+
+                # === STEP 12: TRACK ===
                 if start_step <= PipelineStep.TRACK:
                     video.pipeline_step = PipelineStep.TRACK
                     if video.youtube_video_id:
                         video.status = VideoStatus.PUBLISHED
                     else:
-                        video.status = VideoStatus.ASSEMBLING  # completed locally
+                        video.status = VideoStatus.ASSEMBLING
                     await db.commit()
-                    logger.info(f"Step 11 (Track): pipeline complete")
+                    logger.info("Step 12 (Track): pipeline complete")
 
-                logger.info(f"Pipeline completed for video {video_id} through step "
-                            f"{video.pipeline_step}")
+                total_float = float(total_cost)
+                logger.info(f"Pipeline completed for video {video_id} — total cost: ${total_float:.4f}")
 
                 return PipelineResult(
                     video_id=video_id,
@@ -311,6 +380,9 @@ class VideoPipeline:
                     final_step=video.pipeline_step,
                     video_path=video.final_video_path,
                     thumbnail_path=video.thumbnail_path,
+                    shorts_path=shorts_path,
+                    youtube_video_id=video.youtube_video_id,
+                    youtube_shorts_id=shorts_video_id,
                 )
 
             except Exception as e:

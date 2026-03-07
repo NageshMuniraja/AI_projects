@@ -44,7 +44,7 @@ class ScriptGenerator:
         topic: str,
         niche: str,
         tone: str = "engaging and conversational",
-        duration_minutes: int = 10,
+        duration_minutes: int = 6,
     ) -> Script:
         """Generate a full YouTube script for the given topic."""
         target_word_count = duration_minutes * self.WORDS_PER_MINUTE

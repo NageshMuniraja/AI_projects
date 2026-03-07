@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -6,6 +7,11 @@ from app.models.video import Video, VideoStatus
 from app.schemas.video import PipelineStatusResponse, PipelineTriggerRequest, VideoResponse
 
 router = APIRouter()
+
+
+class KidsShortRequest(BaseModel):
+    topic: str
+    channel_id: int | None = None
 
 PIPELINE_STEPS = [
     {"step": 1, "name": "Research", "status_field": VideoStatus.RESEARCHING},
@@ -86,3 +92,11 @@ async def resume_pipeline(video_id: int, db: AsyncSession = Depends(get_db)):
     resume_pipeline_task.delay(video.id)
 
     return video
+
+
+@router.post("/kids-short", status_code=202)
+async def trigger_kids_short(request: KidsShortRequest):
+    """Trigger a standalone kids YouTube Short generation."""
+    from app.workers.video_tasks import run_kids_short_task
+    task = run_kids_short_task.delay(request.topic, request.channel_id)
+    return {"task_id": task.id, "topic": request.topic, "status": "dispatched"}

@@ -38,6 +38,7 @@ media/temp/
 # Credentials
 *.pickle
 *.token
+*token*.json
 youtube_credentials.json
 client_secret*.json
 

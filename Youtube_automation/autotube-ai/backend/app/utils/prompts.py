@@ -1,282 +1,258 @@
 """AI prompt templates for script generation, SEO, and content strategy.
 
-Optimized for maximum viewer retention, CTR, and algorithmic reach.
+Optimized for story-driven faceless YouTube channels.
+Designed for 5-7 minute videos (sweet spot for monetization + retention).
 """
 
-SCRIPT_SYSTEM_PROMPT = """You are a top-tier YouTube scriptwriter who deeply understands the algorithm.
+SCRIPT_SYSTEM_PROMPT = """You are an elite YouTube scriptwriter for faceless channels that get millions of views.
 
-Core algorithm knowledge you apply:
-- The first 8 seconds determine if mobile viewers keep watching (thumb-stop moment)
-- The 30-second mark is the biggest drop-off point — you MUST re-hook here
-- Average View Duration (AVD) is YouTube's #1 ranking signal
-- Curiosity gaps every 30-45 seconds prevent click-away
-- Videos over 8 minutes can run mid-roll ads — build natural break points
-- Emotional peaks (surprise, awe, anger) drive shares and comments — the algorithm amplifies these
-- Pattern interrupts reset attention: change pacing, tone, or visual cue markers
-- Short punchy sentences (5 words) alternated with longer explanatory ones (20 words) create rhythm
-- Questions addressed directly to the viewer boost comments
+You write like the best channels: ColdFusion, Veritasium, Bright Side, Aperture.
+Your scripts tell STORIES, not listicles. Every video follows a narrative arc.
 
-You write scripts that feel like a friend sharing something incredible — never robotic, never generic.
+STORYTELLING FRAMEWORK:
+- Every video is a STORY with a protagonist (a person, company, idea, or the viewer)
+- Conflict drives everything — what went wrong? what's at stake? who's fighting who?
+- Build tension scene by scene, each reveal bigger than the last
+- The climax should feel like a movie twist — reframe everything the viewer assumed
+- End with a powerful insight that changes how they see the world
 
-BANNED phrases (instant viewer drop-off):
-- "In today's video" / "In this video" / "Welcome back"
-- "Let's dive in" / "Let's get started" / "Without further ado"
-- "In today's digital landscape" / "In an ever-changing world"
-- "It's important to note" / "It goes without saying"
-- "At the end of the day" / "When all is said and done"
-- "But wait, there's more" (infomercial vibes)
-- "Make sure to like and subscribe" (save for CTA section only)
-- Any form of "buckle up" or "strap in"
-- "Did you know" as an opener (overused)"""
+ALGORITHM MASTERY:
+- First 3 seconds: pattern interrupt that stops the scroll
+- 8-second rule: viewer decides to stay — deliver a shocking promise
+- 30-second cliff: biggest drop-off — hit them with a dramatic turn
+- Average View Duration is YouTube's #1 ranking signal
+- Curiosity gaps every 25-35 seconds prevent click-away
+- Emotional peaks (shock, awe, outrage) drive shares = algorithm boost
+
+VOICE & TONE:
+- Narrator telling an incredible true story, not a teacher lecturing
+- Short punchy sentences mixed with flowing descriptive ones
+- Paint scenes: "Picture this..." / "It was 3am when..."
+- Use present tense for dramatic moments: "He walks into the room. The screen goes dark."
+- Questions to the viewer: "Would you have done the same?"
+
+BANNED (instant drop-off):
+"In today's video", "In this video", "Welcome back", "Let's dive in",
+"Let's get started", "Without further ado", "buckle up", "strap in",
+"Did you know" (as opener), "first/second/lastly", "in conclusion",
+"it goes without saying", "needless to say", "at the end of the day"
+"""
 
 SCRIPT_GENERATION_PROMPT = """Write a YouTube script about: {topic}
 
 Niche: {niche}
-Target duration: {duration_minutes} minutes ({word_count} words)
+Target: {duration_minutes} minutes (~{word_count} words)
 Tone: {tone}
 
-=== STRUCTURE (follow EXACTLY) ===
+=== NARRATIVE STRUCTURE ===
 
-**SECOND 1-4 — PATTERN INTERRUPT** (one shocking line, NO setup):
-Drop the viewer into the most surprising, counterintuitive, or emotionally charged fact.
-Example formats: "A teenager just [shocking thing]." / "[Big number] people don't know this." / "This changes everything about [topic]."
+**COLD OPEN (Second 1-5)** — 1-2 lines, <20 words:
+Drop the viewer into the middle of the story. No context.
+Examples: "A $40 billion company just vanished overnight."
+"Three engineers in a garage just changed everything."
+"The email arrived at 2:47am. Nobody was ready."
 
-**SECOND 4-8 — THUMB-STOP HOOK** (tell mobile scrollers why to stop):
-Explain in one sentence what they'll discover and why it matters to THEM personally.
-Create an open loop they can't resist closing.
+**THE HOOK (Second 5-15)** — 3-4 sentences:
+Set up the central mystery/conflict. What's the story about?
+Create an irresistible open loop the viewer MUST see resolved.
+End with: "And what happened next... nobody saw coming."
 
-**SECOND 8-30 — CONTEXT BRIDGE**:
-Provide just enough context to understand the topic. Promise specific value.
-Build credibility with one surprising data point. End with a micro-cliffhanger going into the body.
+**ACT 1 — THE SETUP (Second 15-60)**:
+- Introduce the protagonist (person, company, or concept)
+- Paint the scene — make viewers SEE it ("Picture a tiny office in...")
+- Show what was at stake
+- End with a mini-cliffhanger into Act 2
+- [B-ROLL: vivid scene description for AI image generation]
 
-**SECOND 30 — THE RE-HOOK** (CRITICAL — biggest drop-off point):
-Insert a dramatic shift: "But here's where it gets really crazy..." / "And that's not even the most insane part..." / "Now forget everything I just said, because..."
-This line ALONE can save 15-20% of viewers from dropping off.
+**SECOND 30 — RE-HOOK** (CRITICAL — save 20% of viewers):
+Dramatic pivot. "But here's what nobody saw coming."
 
-**BODY** (5-7 key points):
-For each point:
-1. Transition hook (never use "next" or "moving on" — use story bridges)
-2. Bold claim or surprising statement
-3. Evidence: specific numbers, dates, expert quotes, studies
-4. Relatable analogy or "imagine this" scenario
-5. Emotional spike: make them feel surprise, outrage, awe, or excitement
-6. Micro-cliffhanger teasing the next point
+**ACT 2 — THE CONFLICT (60-180 seconds)**:
+Build tension through 3-4 escalating reveals. Each one bigger:
+1. "It started small..." → first sign something was off
+2. "Then things got serious..." → stakes raised dramatically
+3. "But the real shock was..." → the twist nobody expected
+4. "And that's when everything changed." → point of no return
 
-After each point, include visual/audio markers on their own line:
-[B-ROLL: specific visual description for stock footage — be descriptive]
-[MUSIC: mood descriptor like "tension rising" or "triumphant swell"]
-[EMPHASIS] before the single most impactful line in each section
+For each reveal:
+- Tell it like a SCENE, not a fact dump
+- Use specific details: names, dates, dollar amounts, locations
+- Emotional anchors: "Imagine being the person who..."
+- [B-ROLL: dramatic visual matching the scene mood]
+- [EMPHASIS] before the most impactful line
 
-**CURIOSITY GAPS** — Insert one every 30-45 seconds:
-- "But what happened next shocked everyone..."
-- "And this is where the story takes a dark turn..."
-- "There's one detail nobody talks about..."
-- "The answer will change how you think about [topic]..."
+**ACT 3 — THE CLIMAX (180-240 seconds)**:
+The big reveal / twist / resolution.
+- Reframe everything: "But here's what everyone missed..."
+- The "aha moment" that makes viewers share the video
+- Connect it to the viewer: "And this affects YOU because..."
+- [B-ROLL: powerful visual for the climax]
 
-**AD-BREAK MARKERS** — If script exceeds 8 minutes, add `[AD-BREAK]` at 2-3 natural transition points after the 8-minute mark. These should feel like chapter breaks, not interruptions.
-
-**PACING VARIATION**:
-- Alternate short punchy sentences (3-7 words) with longer explanatory ones (15-25 words)
-- Use sentence fragments for impact. Like this. Powerful.
-- Rhetorical questions to engage: "So what does this mean for you?"
-- Direct address: "You" should appear at least once every 3-4 sentences
-
-**EMOTIONAL ARC**:
-Build tension → small release → bigger tension → bigger release → CLIMAX → resolution
-The climax should be in the final third of the body, not the end.
-
-**CTA** (30 seconds):
-- Ask a SPECIFIC opinion question related to the topic (drives comments)
-- Mention subscribing naturally ("If this blew your mind, you'll love what's coming next week")
-- Do NOT say "smash that like button" — instead give a reason: "Drop a like so I know to make more of these"
-
-**OUTRO** (15 seconds):
-- Tease the SPECIFIC next video topic with a hook
-- End on an open loop or thought-provoking statement
-- Final line should be quotable/memorable
+**THE TAKEAWAY (Last 30-45 seconds)**:
+- What does this MEAN for the viewer?
+- A powerful one-liner they'll remember
+- CTA: ONE specific question that drives comments
+- Subscribe mention: "If this story blew your mind, subscribe"
+- Tease next video with a hook
 
 === RULES ===
-- Write conversationally — read it aloud; if it sounds like an essay, rewrite it
-- Include specific numbers, dates, dollar amounts, and names — vagueness kills retention
-- Every sentence must earn its place — if removing it doesn't hurt, remove it
-- Mark emphasis with [EMPHASIS] before the most impactful line per section
-- [B-ROLL: description] markers should describe SPECIFIC visuals, not vague concepts
-- NO phrases from the banned list
-- NO generic transitions ("first," "second," "lastly")
-- Use story bridges between sections: cause-effect, "but," "so," "which means"
+- Tell a STORY, not a listicle. No "point 1, point 2" structure
+- Write for the EAR, not the eye — if it sounds like an essay, rewrite
+- Specific numbers always ($47.3B, 14.7M users, 83% failure rate)
+- "You" every 3-4 sentences — make it personal
+- [B-ROLL: description] — describe CINEMATIC scenes for AI image generation
+  Good: "A dimly lit server room with rows of blinking lights, blue glow"
+  Bad: "technology" or "computers"
+- [MUSIC: mood] markers at tone shifts (tense, hopeful, dark, triumphant)
+- TIGHT writing — {word_count} words MAX, every sentence earns its place
+- NO filler, NO generic transitions
+- Curiosity gaps every 25-35 seconds
 """
 
-SEO_TITLE_PROMPT = """Generate 10 YouTube video titles for a video about: {topic}
+SEO_TITLE_PROMPT = """Generate 10 YouTube titles for: {topic}
 
 Niche: {niche}
 Target audience: {target_audience}
 
-Use these PROVEN viral title patterns (mix at least 6 different ones):
+PROVEN viral patterns (use at least 6 different ones):
 
-1. Question-based: "Why Does X Do Y?" (40% CTR boost over statements)
-2. Number listicle: "7 Reasons X Will Y" (odd numbers outperform even)
-3. How-to split: "How I [achieved X]" (personal) AND "How to [achieve X]" (tutorial)
-4. Fear/urgency: "X Before It's Too Late" / "Stop Doing X Immediately"
-5. Controversy: "Nobody Is Talking About X" / "Why Everyone Is Wrong About X"
-6. Secret reveal: "The Hidden Truth About X" / "What X Doesn't Want You to Know"
+1. Question: "Why Does X Do Y?" (40% CTR boost)
+2. Number: "5 Ways X Will Y" (odd numbers win)
+3. How-to: "How I [achieved X]" or "How to [achieve X]"
+4. Fear: "X Before It's Too Late" / "Stop Doing X NOW"
+5. Controversy: "Nobody Is Talking About X"
+6. Secret: "The Hidden Truth About X"
 7. Comparison: "X vs Y — The Winner Surprised Me"
-8. Challenge: "I Tried X for 30 Days — Here's What Happened"
+8. Challenge: "I Tried X for 30 Days"
 9. Prediction: "X Will Change Everything in {current_year}"
-10. Superlative: "The Most X Thing Ever" / "The Biggest X Mistake"
-11. Specific number: "$X,XXX" or exact stats in title
-12. Parenthetical: "Title (this changes everything)" — adds intrigue
+10. Superlative: "The Most X Thing Ever"
+11. Specific number: "$47B" or exact stats
+12. Parenthetical: "Title (this changes everything)"
 13. Warning: "WARNING: X" / "Don't X Until You Watch This"
 14. Social proof: "Why X Million People Are Doing Y"
-15. Time-pressure: "X in 2026" / "The Future of X"
+15. Time-pressure: "X in {current_year}"
 
 Rules:
-- Each title MUST be under 60 characters (YouTube truncates longer ones)
-- Front-load the primary keyword (first 3-4 words)
-- Use power words: shocking, secret, insane, genius, hidden, brutal, incredible
-- Create curiosity gaps — the title should raise a question the viewer needs answered
-- Do NOT use clickbait that the video can't deliver on
-- Capitalize key words for emphasis (but not ALL caps for entire title)
-- Avoid colons — use dashes or pipes instead
+- UNDER 60 characters each (YouTube truncates longer)
+- Front-load primary keyword (first 3-4 words)
+- Power words: shocking, secret, insane, genius, hidden, brutal
+- Create curiosity gap — title raises a question they NEED answered
+- NO clickbait the video can't deliver
 
-Return as a numbered list. For each title, add a brief note in parentheses explaining why it would get clicks. Rank by predicted CTR (best first).
-
-Example format:
-1. "Title Here" (uses curiosity gap + specific number — high CTR)
-2. "Another Title" (fear pattern + keyword front-loaded)
+Return numbered list. Add (reasoning) after each. Rank by predicted CTR.
 """
 
-SEO_DESCRIPTION_PROMPT = """Write a YouTube video description for:
+SEO_DESCRIPTION_PROMPT = """Write a YouTube description for:
 Title: {title}
 Topic: {topic}
 
-=== CRITICAL RULES ===
+RULES:
 
-**First 150 characters** (shown in YouTube search results — this is your ad copy):
-- Compelling hook with the primary keyword
-- Must make the viewer click — treat it like a Google ad headline
-- Do NOT start with "In this video" or "Welcome to"
+**First 150 chars** (shown in search — this is your ad copy):
+Compelling hook with primary keyword. NOT "In this video".
 
 **Structure:**
+[Hook with keyword — 150 chars]
 
-[First 150 chars: hook with keyword]
+[2-3 sentences: what viewer will learn]
 
-[2-3 sentence expansion of what the viewer will learn]
+Timestamps:
+00:00 - [Hook]
+[Generate timestamps for a {duration_minutes}-minute video with 4-5 sections]
 
-[EMOJI] Timestamps:
-00:00 - [Hook/Intro title]
-[Generate accurate timestamps based on a {duration_minutes}-minute video with 5-7 sections]
-[Space sections roughly evenly]
+Key Takeaways:
+- [3-4 bullet points]
 
-[Paragraph about the topic with natural keyword placement — 2-3% keyword density]
-
-[EMOJI] Key Takeaways:
-- [3-5 bullet points of main value propositions]
-
-[EMOJI] Related Videos You'll Love:
-- [Suggest 2-3 related topic titles the channel might cover]
-
----
-Subscribe for more {niche} content [EMOJI]
+Subscribe for more {niche} content
 
 #[PrimaryKeyword] #[SecondaryKeyword] #[NicheKeyword]
 
 Requirements:
-- Total length: 300-500 words
-- Include 3 hashtags above (YouTube displays them above the title)
-- Natural keyword placement — NOT keyword stuffing
-- Use 3-5 relevant emojis as section markers
-- Include a subscribe CTA
+- 200-400 words total (not bloated)
+- 3 hashtags (displayed above title)
+- Natural keyword placement, 2-3% density
+- Include subscribe CTA
 """
 
-SEO_TAGS_PROMPT = """Generate 30 YouTube tags for a video about: {topic}
+SEO_TAGS_PROMPT = """Generate 25 YouTube tags for: {topic}
 Niche: {niche}
 Title: {title}
 
 Strategy:
-- 5 exact-match tags (the exact topic phrase and close variants)
-- 8 broad tags (high search volume, niche-level)
-- 10 medium-tail tags (topic + modifier combinations)
-- 7 long-tail specific tags (question-based, how-to phrases)
+- 5 exact-match (topic phrase + close variants)
+- 7 broad (high volume, niche-level)
+- 8 medium-tail (topic + modifiers)
+- 5 long-tail (questions, how-to phrases)
 
 Rules:
-- First tag should be the exact video title
-- Include common misspellings of key terms if applicable
-- Include "shorts" variant if topic works for Shorts
-- Each tag max 30 characters
-- Mix singular and plural forms
-- Include competitor/related channel topic tags
+- First tag = exact video title
+- Each tag under 30 chars
+- Total chars under 450 (YouTube limit is 500)
+- Include "shorts" variant
+- Mix singular/plural
 
-Return as a comma-separated list with NO numbering.
+Return comma-separated, NO numbering.
 """
 
-CONTENT_STRATEGY_PROMPT = """Analyze channel performance data and suggest the next 10 video topics.
+CONTENT_STRATEGY_PROMPT = """Analyze channel data and suggest 10 video topics.
 
 Channel niche: {niche}
 
-=== PERFORMANCE DATA ===
+=== DATA ===
 
-Top performing videos (last 30 days):
+Top videos (30 days):
 {top_videos_data}
 
-Performance metrics breakdown:
+Performance:
 {performance_metrics}
 
-Recent topics covered (avoid repeating):
+Recent topics (avoid repeats):
 {recent_topics}
 
-=== ANALYSIS INSTRUCTIONS ===
+=== INSTRUCTIONS ===
 
-1. **Pattern Recognition**: Identify what the top videos have in common:
-   - Title patterns (questions vs. listicles vs. how-to)
-   - Topic themes that resonate
-   - Engagement patterns (high comments = opinion topics)
+1. Pattern Recognition: What do top videos have in common?
+2. Gap Analysis: What hasn't been covered?
+3. Trend Alignment: What's trending NOW?
 
-2. **Gap Analysis**: What related topics haven't been covered yet?
+=== OUTPUT ===
 
-3. **Trend Alignment**: Which topics are currently trending in this niche?
+For each topic:
+**[N]. [Topic]**
+- Why: [1 sentence with data]
+- Virality: [1-100]
+- Type: TRENDING / EVERGREEN / HYBRID
+- Suggested title: [viral title]
+- Content angle: [unique twist]
 
-=== OUTPUT FORMAT ===
-
-For each of the 10 topic suggestions:
-
-**[Number]. [Topic Title]**
-- Why it will perform: [1 sentence citing specific data from above]
-- Virality score: [1-100]
-- Type: [TRENDING / EVERGREEN / HYBRID]
-- Suggested title pattern: [specific title using a viral pattern]
-- Content angle: [unique twist that differentiates from competitors]
-
-Balance: 60% trending topics (ride the wave), 30% evergreen (long-term search traffic), 10% experimental (test new angles).
-
-Rank by predicted performance (best first). Weight recent performance data (last 7 days) 2x higher than older data.
+Balance: 60% trending, 30% evergreen, 10% experimental.
+Rank by predicted performance.
 """
 
-VIRALITY_SCORING_PROMPT = """Score this topic's viral potential for a YouTube video.
+VIRALITY_SCORING_PROMPT = """Score this topic's viral potential.
 
 Topic: {topic}
 Niche: {niche}
 Current trends: {current_trends}
 
-=== SCORING DIMENSIONS (rate each 1-10) ===
+=== DIMENSIONS (1-10 each) ===
 
-1. **Search Demand**: Is there high search volume? Is the trend growing or declining?
-2. **Competition Gap**: How many recent videos cover this? Is there room to stand out?
-3. **Emotional Intensity**: Does this topic trigger strong emotions (anger, surprise, awe, fear)? Stronger emotions = more shares
-4. **Shareability**: Would someone send this to a friend? Does it make the sharer look smart/informed?
-5. **Timeliness**: Is this trending RIGHT NOW or is it evergreen? Breaking news scores highest
-6. **Watch Time Potential**: Can this topic sustain attention for 8-12 minutes? Or will viewers lose interest?
-7. **Comment Bait**: Does this topic provoke opinions and debate? Controversial > informational for engagement
-8. **Thumbnail Potential**: Can we create a visually compelling, click-worthy thumbnail for this?
-9. **Niche Authority Fit**: Does this match the channel's established expertise and audience expectations?
-10. **Series Potential**: Could this become a franchise (Part 2, monthly updates, etc.)?
-11. **Monetization Value**: Do advertisers pay well for this topic's audience? (Finance/tech > entertainment)
-12. **Cross-Platform Potential**: Would this work as a TikTok, Instagram Reel, or YouTube Short too?
+1. Search Demand: Volume + trend direction
+2. Competition Gap: Room to stand out?
+3. Emotional Intensity: Shock, awe, anger, fear
+4. Shareability: Would someone send this?
+5. Timeliness: Trending now vs evergreen
+6. Watch Time: Can it hold 5-8 min?
+7. Comment Bait: Provokes opinions?
+8. Thumbnail Potential: Visually compelling?
+9. Niche Fit: Matches channel expertise?
+10. Series Potential: Could be a franchise?
+11. Monetization: Advertiser value?
+12. Cross-Platform: Works as Short/Reel?
 
-=== OUTPUT FORMAT ===
-
-Return ONLY a JSON object:
+Return ONLY JSON:
 {{
-  "overall_score": [1-100 weighted average],
+  "overall_score": [1-100],
   "dimensions": {{
     "search_demand": [1-10],
     "competition_gap": [1-10],
@@ -291,8 +267,19 @@ Return ONLY a JSON object:
     "monetization_value": [1-10],
     "cross_platform": [1-10]
   }},
-  "reasoning": "[2-3 sentence explanation of the score]",
-  "recommended_angle": "[specific unique angle to cover this topic]",
-  "suggested_title": "[one viral title suggestion]"
+  "reasoning": "[2 sentences]",
+  "recommended_angle": "[unique angle]",
+  "suggested_title": "[viral title]"
 }}
+"""
+
+SHORTS_HOOK_PROMPT = """Generate 5 scroll-stopping hooks (under 8 words each) for a YouTube Short about: {topic}
+
+Rules:
+- Must work WITHOUT any context
+- Must create instant curiosity
+- Use pattern interrupts: shocking claims, bold questions, warnings
+- ALL CAPS for key words
+
+Return numbered list, one per line.
 """

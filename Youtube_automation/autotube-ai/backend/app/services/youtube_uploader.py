@@ -36,7 +36,7 @@ class YouTubeUploader:
         description: str,
         tags: list[str] | None = None,
         category_id: str = "22",
-        privacy_status: str = "private",
+        privacy_status: str = "public",
         publish_at: datetime | None = None,
         thumbnail_path: str | None = None,
     ) -> UploadResult:
@@ -44,12 +44,17 @@ class YouTubeUploader:
         if not Path(video_path).exists():
             raise FileNotFoundError(f"Video file not found: {video_path}")
 
+        # Clean markdown from description
+        import re
+        description = re.sub(r"\*\*", "", description)
+        description = re.sub(r"__", "", description)
+
         # Build request body
         body = {
             "snippet": {
                 "title": title[:100],
                 "description": description[:5000],
-                "tags": (tags or [])[:30],
+                "tags": self._sanitize_tags(tags or []),
                 "categoryId": category_id,
                 "defaultLanguage": "en",
             },
@@ -103,6 +108,24 @@ class YouTubeUploader:
             title=title,
             status=privacy_status,
         )
+
+    @staticmethod
+    def _sanitize_tags(tags: list[str]) -> list[str]:
+        """Sanitize tags for YouTube: strip special chars, enforce 500 char limit."""
+        import re
+        clean = []
+        total = 0
+        for tag in tags[:25]:
+            # Strip special characters YouTube doesn't allow
+            tag = re.sub(r"[<>&\"\\\|{}^~`]", "", tag)
+            tag = tag.strip()[:30]
+            if not tag or len(tag) < 2:
+                continue
+            if total + len(tag) > 450:
+                break
+            clean.append(tag)
+            total += len(tag)
+        return clean
 
     def _set_thumbnail(self, video_id: str, thumbnail_path: str) -> bool:
         """Set a custom thumbnail for a video."""
