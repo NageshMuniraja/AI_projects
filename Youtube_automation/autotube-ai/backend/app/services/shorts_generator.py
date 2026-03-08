@@ -3,10 +3,9 @@
 Features:
 - Native 1080x1920 vertical rendering (not cropped horizontal)
 - AI-selected viral segments from main video script
-- Portrait DALL-E 3 images (1024x1792) with cinematic or kids style
-- Ken Burns animation with easing curves
+- AI video clips (DALL-E 3 -> motion synthesis) — NO static images
 - Animated captions (large, bold, mobile-optimized)
-- Crossfade transitions between images (0.5s)
+- Crossfade transitions between video clips (0.5s)
 - Background music generation and mixing
 - Kids content mode (bright colorful AI visuals, fun narration, cheerful music)
 """
@@ -27,6 +26,8 @@ from moviepy import (
     ColorClip,
     CompositeVideoClip,
     ImageClip,
+    VideoFileClip,
+    concatenate_videoclips,
 )
 from PIL import Image, ImageDraw, ImageFont
 
@@ -44,8 +45,11 @@ class ShortsResult:
     cost_usd: float = 0.0
 
 
-# --- Crossfade duration between image clips ---
+# --- Crossfade duration between clips ---
 CROSSFADE_SEC = 0.5
+
+# --- Video file extensions ---
+VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov", ".avi", ".mkv"}
 
 # --- Segment selection prompt (for extracting from main video) ---
 SHORTS_EXTRACT_PROMPT = """Analyze this YouTube script and identify the SINGLE BEST 45-55 second segment for a YouTube Short.
@@ -61,7 +65,7 @@ Requirements for the perfect Short:
 - Prefer segments with: shocking facts, surprising statistics, emotional stories, or controversial takes
 - The segment should feel complete — not cut off mid-thought
 
-Also extract 3-4 visual descriptions for AI image generation that match the segment content.
+Also extract 3-4 visual descriptions for AI video generation that match the segment content.
 
 Return ONLY this JSON (no other text):
 {{
@@ -69,7 +73,7 @@ Return ONLY this JSON (no other text):
   "end_sentence": "[exact last sentence of the segment]",
   "hook_text": "[2-3 word hook to overlay at start, e.g. 'This is INSANE' or 'Nobody knows this']",
   "why": "[1 sentence why this segment will go viral as a Short]",
-  "visuals": ["description 1 for AI image", "description 2", "description 3"]
+  "visuals": ["description 1 for AI video", "description 2", "description 3"]
 }}"""
 
 # --- Kids content prompts ---
@@ -86,7 +90,7 @@ Rules:
 - NO scary content, NO violence, NO complex words
 - Use fun sound words: "WHOOSH!", "BOOM!", "WOW!", "SPLAT!"
 
-Include exactly 4 [B-ROLL: description] markers for AI image generation.
+Include exactly 4 [B-ROLL: description] markers for AI video generation.
 Make B-ROLL descriptions vivid, colorful, fun, and kid-friendly.
 Example: [B-ROLL: a cute cartoon T-Rex with big eyes smiling in a colorful jungle with butterflies]
 
@@ -126,6 +130,14 @@ class ShortsGenerator:
         self.client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
         self.asset_collector = AssetCollector()
         self._font_path = self._find_font()
+        self._video_gen = None
+
+    @property
+    def video_generator(self):
+        if self._video_gen is None:
+            from app.services.ai_video_generator import AIVideoGenerator
+            self._video_gen = AIVideoGenerator()
+        return self._video_gen
 
     # =========================================================================
     # MAIN ENTRY: GENERATE SHORT FROM MAIN VIDEO
@@ -168,12 +180,12 @@ class ShortsGenerator:
                 voiceover_path, start_time, end_time
             )
 
-            # 4. Generate portrait AI images for the Short
+            # 4. Generate portrait AI video clips for the Short
             visuals = segment.get("visuals", [])
             if not visuals:
                 visuals = [segment.get("hook_text", "dramatic cinematic scene")]
 
-            portrait_assets = self._generate_portrait_assets(visuals)
+            portrait_assets = self._generate_portrait_video_assets(visuals)
             total_cost += sum(a.get("cost", 0) for a in portrait_assets)
 
             # 5. Filter caption entries for this time range
@@ -227,7 +239,7 @@ class ShortsGenerator:
     ) -> ShortsResult | None:
         """Generate a standalone kids-focused YouTube Short from scratch.
 
-        Complete pipeline: script -> voiceover -> AI images -> music -> render.
+        Complete pipeline: script -> voiceover -> AI video clips -> music -> render.
         """
         try:
             total_cost = 0.0
@@ -250,13 +262,13 @@ class ShortsGenerator:
             )
             total_cost += vo_cost
 
-            # 4. Extract B-ROLL markers and generate kids AI images
+            # 4. Extract B-ROLL markers and generate kids AI video clips
             markers = re.findall(r"\[B-ROLL:\s*(.+?)\]", script_text)
             if not markers:
                 markers = [f"colorful fun illustration about {topic}"] * 3
 
-            logger.info(f"Kids Short: Generating {len(markers)} AI images")
-            portrait_assets = self._generate_kids_assets(markers[:4])
+            logger.info(f"Kids Short: Generating {len(markers)} AI video clips")
+            portrait_assets = self._generate_kids_video_assets(markers[:4])
             total_cost += sum(a.get("cost", 0) for a in portrait_assets)
 
             # 5. Generate cheerful kids background music
@@ -337,14 +349,42 @@ class ShortsGenerator:
         cost = len(script) / 1000 * 0.030
         return str(output_path), cost, duration
 
-    def _generate_kids_assets(self, descriptions: list[str]) -> list[dict]:
-        """Generate bright colorful portrait AI images for kids Short."""
+    # =========================================================================
+    # VIDEO ASSET GENERATION (replaces static image generation)
+    # =========================================================================
+
+    def _generate_portrait_video_assets(self, visual_descriptions: list[str]) -> list[dict]:
+        """Generate portrait-oriented AI video clips for the Short."""
+        assets = []
+        output_dir = settings.footage_dir / "shorts"
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        for desc in visual_descriptions[:4]:
+            asset = self._generate_dalle_video_clip(
+                desc, output_dir, style="cinematic", orientation="portrait"
+            )
+            if asset:
+                assets.append(asset)
+            else:
+                # Fallback: try Pexels video
+                fallback = self.asset_collector._collect_single_asset(
+                    desc, output_dir, orientation="portrait"
+                )
+                if fallback:
+                    assets.append({"path": fallback.local_path, "cost": fallback.cost_usd})
+
+        return assets
+
+    def _generate_kids_video_assets(self, descriptions: list[str]) -> list[dict]:
+        """Generate bright colorful portrait AI video clips for kids Short."""
         assets = []
         output_dir = settings.footage_dir / "kids_shorts"
         output_dir.mkdir(parents=True, exist_ok=True)
 
         for desc in descriptions[:4]:
-            asset = self._generate_kids_dalle_image(desc, output_dir)
+            asset = self._generate_dalle_video_clip(
+                desc, output_dir, style="kids", orientation="portrait"
+            )
             if asset:
                 assets.append(asset)
             else:
@@ -352,39 +392,62 @@ class ShortsGenerator:
                     desc, output_dir, orientation="portrait"
                 )
                 if fallback:
-                    assets.append({
-                        "path": fallback.local_path,
-                        "cost": fallback.cost_usd,
-                    })
+                    assets.append({"path": fallback.local_path, "cost": fallback.cost_usd})
 
         return assets
 
-    def _generate_kids_dalle_image(self, description: str, output_dir: Path) -> dict | None:
-        """Generate a kids-style portrait image using DALL-E 3."""
+    def _generate_dalle_video_clip(
+        self,
+        description: str,
+        output_dir: Path,
+        style: str = "cinematic",
+        orientation: str = "portrait",
+    ) -> dict | None:
+        """Generate DALL-E 3 image then convert to dynamic video clip."""
         try:
             import openai
 
             client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
-            prompt = KIDS_DALLE_PROMPT.format(description=description)
+
+            if style == "kids":
+                prompt = KIDS_DALLE_PROMPT.format(description=description)
+                size = "1024x1792"
+            else:
+                prompt = (
+                    f"Cinematic photorealistic scene: {description}. "
+                    "Dramatic lighting, shallow depth of field, "
+                    "professional cinematography, 8K quality, "
+                    "no text, no watermarks"
+                )
+                size = "1024x1792" if orientation == "portrait" else "1792x1024"
 
             response = client.images.generate(
                 model="dall-e-3",
                 prompt=prompt,
-                size="1024x1792",
-                quality="standard",
+                size=size,
+                quality="hd",
                 n=1,
                 response_format="b64_json",
             )
 
             image_data = base64.b64decode(response.data[0].b64_json)
-            output_path = get_unique_path(output_dir, "kids_dalle", ".png")
-            output_path.write_bytes(image_data)
+            image_path = get_unique_path(output_dir, "dalle_src", ".png")
+            image_path.write_bytes(image_data)
 
-            logger.info(f"Kids DALL-E image: {output_path}")
-            return {"path": str(output_path), "cost": 0.040}
+            # Convert static image to dynamic video clip
+            resolution = self.SHORTS_RESOLUTION if orientation == "portrait" else (1920, 1080)
+            video_path, video_cost = self.video_generator.generate_video_clip(
+                image_path=str(image_path),
+                duration=6.0,
+                resolution=resolution,
+                fps=self.FPS,
+            )
+
+            logger.info(f"Short video clip: {video_path}")
+            return {"path": video_path, "cost": 0.080 + video_cost}
 
         except Exception as e:
-            logger.warning(f"Kids DALL-E generation failed: {e}")
+            logger.warning(f"DALL-E video clip generation failed: {e}")
             return None
 
     # =========================================================================
@@ -483,26 +546,6 @@ class ShortsGenerator:
             raise RuntimeError(f"Audio extraction failed: {result.stderr[-300:]}")
 
         return str(output_path)
-
-    def _generate_portrait_assets(self, visual_descriptions: list[str]) -> list[dict]:
-        """Generate portrait-oriented AI images for the Short."""
-        assets = []
-        output_dir = settings.footage_dir / "shorts"
-        output_dir.mkdir(parents=True, exist_ok=True)
-
-        for desc in visual_descriptions[:4]:
-            asset = self.asset_collector._collect_single_asset(
-                desc, output_dir, orientation="portrait"
-            )
-            if asset:
-                assets.append({
-                    "path": asset.local_path,
-                    "cost": asset.cost_usd,
-                })
-            else:
-                logger.warning(f"Short asset failed for: '{desc}'")
-
-        return assets
 
     # =========================================================================
     # BACKGROUND MUSIC GENERATION
@@ -618,7 +661,7 @@ class ShortsGenerator:
         audio = AudioFileClip(final_audio_path)
         actual_duration = audio.duration
 
-        # Build visual track from portrait images with Ken Burns + crossfade
+        # Build visual track from video clips / images with crossfade
         visual_clip = self._build_vertical_visuals(asset_paths, actual_duration)
 
         # Create caption overlay
@@ -672,7 +715,7 @@ class ShortsGenerator:
     def _build_vertical_visuals(
         self, asset_paths: list[str], duration: float
     ) -> CompositeVideoClip:
-        """Build vertical visual track with crossfade transitions between images."""
+        """Build vertical visual track from video clips with crossfade transitions."""
         w, h = self.SHORTS_RESOLUTION
 
         if not asset_paths:
@@ -690,7 +733,7 @@ class ShortsGenerator:
         clips = []
         for path in valid_paths:
             try:
-                clip = self._prepare_portrait_image(path, segment_dur)
+                clip = self._prepare_portrait_asset(path, segment_dur)
                 clips.append(clip)
             except Exception as e:
                 logger.warning(f"Failed to load Short asset {path}: {e}")
@@ -735,10 +778,55 @@ class ShortsGenerator:
         result = CompositeVideoClip(composed, size=(w, h))
         return result.with_duration(duration)
 
+    def _prepare_portrait_asset(
+        self, path: str, duration: float
+    ) -> VideoFileClip | ImageClip:
+        """Load a portrait asset — video clip or image with Ken Burns fallback."""
+        w, h = self.SHORTS_RESOLUTION
+        p = Path(path)
+
+        if p.suffix.lower() in VIDEO_EXTENSIONS:
+            return self._prepare_portrait_video(path, duration)
+        else:
+            return self._prepare_portrait_image(path, duration)
+
+    def _prepare_portrait_video(
+        self, path: str, duration: float
+    ) -> VideoFileClip:
+        """Load and fit a video clip to 9:16 portrait resolution."""
+        w, h = self.SHORTS_RESOLUTION
+        clip = VideoFileClip(path)
+
+        # Loop or trim to target duration
+        if clip.duration < duration:
+            loops = int(duration / clip.duration) + 1
+            clip = concatenate_videoclips([clip] * loops)
+        clip = clip.subclipped(0, duration)
+
+        # Scale to fill 9:16 frame
+        clip_ratio = clip.w / clip.h
+        target_ratio = w / h
+
+        if clip_ratio > target_ratio:
+            new_h = h
+            new_w = int(clip.w * (h / clip.h))
+        else:
+            new_w = w
+            new_h = int(clip.h * (w / clip.w))
+
+        clip = clip.resized((new_w, new_h))
+
+        # Center crop to exact resolution
+        x_offset = (new_w - w) // 2
+        y_offset = (new_h - h) // 2
+        clip = clip.cropped(x1=x_offset, y1=y_offset, x2=x_offset + w, y2=y_offset + h)
+
+        return clip
+
     def _prepare_portrait_image(
         self, path: str, duration: float
     ) -> ImageClip:
-        """Load portrait image with Ken Burns animation for 9:16."""
+        """Load portrait image with Ken Burns animation for 9:16 (fallback for non-video assets)."""
         w, h = self.SHORTS_RESOLUTION
         img = Image.open(path).convert("RGB")
 

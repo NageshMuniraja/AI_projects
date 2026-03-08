@@ -225,7 +225,8 @@ class VideoAssembler:
                 continue
 
             try:
-                if atype == "stock_video":
+                # All AI assets are now video clips; images only from legacy/fallback
+                if path.suffix in (".mp4", ".webm", ".mov"):
                     clip = self._prepare_video_clip(str(path), segment_duration, resolution)
                 else:
                     clip = self._prepare_image_clip_enhanced(str(path), segment_duration, resolution)

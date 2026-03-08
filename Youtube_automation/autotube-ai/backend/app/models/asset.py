@@ -9,6 +9,7 @@ from app.database import Base
 
 class AssetType(str, enum.Enum):
     STOCK_VIDEO = "stock_video"
+    AI_VIDEO = "ai_video"
     AI_IMAGE = "ai_image"
     MUSIC = "music"
     SFX = "sfx"

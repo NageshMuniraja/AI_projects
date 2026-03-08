@@ -1,16 +1,16 @@
-"""Asset Collector Service — sources AI-generated and stock footage visuals.
+"""Asset Collector Service — sources AI-generated video clips and stock footage.
 
-Priority order:
-1. DALL-E 3 AI images (cinematic, topic-matched, unique)
-2. Pexels stock video
-3. Pixabay stock video
-4. Pexels stock image
-5. Stability AI image (fallback)
+Pipeline per asset:
+1. Generate DALL-E 3 image (cinematic, topic-matched)
+2. Convert image to dynamic video clip (Stability SVD or motion synthesis)
+3. Fallback: stock video from Pexels/Pixabay
+
+All assets are VIDEO CLIPS — no static images in the final output.
 """
 
 import base64
 import re
-import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -24,8 +24,8 @@ from app.utils.file_manager import get_unique_path
 
 @dataclass
 class CollectedAsset:
-    type: str  # "stock_video", "ai_image", "stock_image"
-    source: str  # "dall_e_3", "pexels", "pixabay", "stability_ai"
+    type: str  # "ai_video", "stock_video"
+    source: str  # "dall_e_3", "pexels", "pixabay", "stability_svd"
     local_path: str
     source_url: str
     description: str
@@ -40,7 +40,6 @@ class AssetCollection:
     total_cost_usd: float = 0.0
 
 
-# DALL-E 3 cinematic prompt — ultra-realistic visuals for faceless YouTube channels
 DALLE_PROMPT_TEMPLATE = (
     "A photorealistic scene: {description}. "
     "Shot on Sony A7IV, 35mm lens, f/1.8 aperture. "
@@ -56,9 +55,9 @@ class AssetCollector:
     PIXABAY_BASE = "https://pixabay.com/api"
     STABILITY_BASE = "https://api.stability.ai/v1"
 
-    # Cost tracking
-    DALLE_COST_PER_IMAGE = 0.040  # DALL-E 3 standard 1792x1024
+    DALLE_COST_PER_IMAGE = 0.040
     STABILITY_COST_PER_IMAGE = 0.02
+    MAX_PARALLEL_WORKERS = 3
 
     def __init__(self):
         self.pexels_key = settings.PEXELS_API_KEY
@@ -67,14 +66,22 @@ class AssetCollector:
         self.openai_key = settings.OPENAI_API_KEY
         self.http = httpx.Client(timeout=60.0)
 
-        # Initialize OpenAI client if key available
         self.openai_client = None
         if self.openai_key:
             try:
                 import openai
                 self.openai_client = openai.OpenAI(api_key=self.openai_key)
             except ImportError:
-                logger.warning("openai package not installed — DALL-E 3 unavailable")
+                logger.warning("openai package not installed")
+
+        self._video_generator = None
+
+    @property
+    def video_generator(self):
+        if self._video_generator is None:
+            from app.services.ai_video_generator import AIVideoGenerator
+            self._video_generator = AIVideoGenerator()
+        return self._video_generator
 
     def collect_assets_for_script(
         self,
@@ -82,10 +89,10 @@ class AssetCollector:
         output_dir: Path | None = None,
         orientation: str = "landscape",
     ) -> AssetCollection:
-        """Parse script for [B-ROLL: description] markers and collect assets.
+        """Parse script for [B-ROLL: description] markers and collect video assets.
 
-        Args:
-            orientation: "landscape" (1792x1024) for main video, "portrait" (1024x1792) for Shorts
+        All assets are converted to video clips — no static images in output.
+        Uses parallel generation for speed (up to 3 concurrent DALL-E calls).
         """
         if output_dir is None:
             output_dir = settings.footage_dir
@@ -98,19 +105,36 @@ class AssetCollector:
             logger.warning("No B-ROLL markers found in script")
             return collection
 
-        logger.info(f"Collecting {len(markers)} assets (orientation={orientation})")
+        logger.info(f"Collecting {len(markers)} video assets (parallel, orientation={orientation})")
 
-        for i, description in enumerate(markers):
-            logger.info(f"Asset {i + 1}/{len(markers)}: '{description}'")
-            asset = self._collect_single_asset(description, output_dir, orientation)
-            if asset:
-                collection.assets.append(asset)
-                collection.total_cost_usd += asset.cost_usd
-            else:
-                logger.warning(f"No asset found for: '{description}'")
+        # Parallel generation for speed
+        with ThreadPoolExecutor(max_workers=self.MAX_PARALLEL_WORKERS) as executor:
+            futures = {}
+            for i, description in enumerate(markers):
+                future = executor.submit(
+                    self._collect_single_asset, description, output_dir, orientation
+                )
+                futures[future] = (i, description)
+
+            for future in as_completed(futures):
+                idx, desc = futures[future]
+                try:
+                    asset = future.result()
+                    if asset:
+                        collection.assets.append(asset)
+                        collection.total_cost_usd += asset.cost_usd
+                        logger.info(f"Asset {idx + 1}/{len(markers)}: {asset.type} ({asset.source})")
+                    else:
+                        logger.warning(f"No asset for: '{desc}'")
+                except Exception as e:
+                    logger.error(f"Asset generation failed for '{desc}': {e}")
+
+        # Sort assets back to script order
+        marker_order = {desc: i for i, desc in enumerate(markers)}
+        collection.assets.sort(key=lambda a: marker_order.get(a.description, 999))
 
         logger.info(
-            f"Collected {len(collection.assets)}/{len(markers)} assets, "
+            f"Collected {len(collection.assets)}/{len(markers)} video assets, "
             f"cost: ${collection.total_cost_usd:.4f}"
         )
         return collection
@@ -118,10 +142,10 @@ class AssetCollector:
     def _collect_single_asset(
         self, description: str, output_dir: Path, orientation: str = "landscape"
     ) -> CollectedAsset | None:
-        """Try to collect a single asset — AI-generated first, stock as fallback."""
-        # 1. DALL-E 3 AI image (primary — best quality, unique visuals)
+        """Generate a single video asset — DALL-E image → video clip pipeline."""
+        # 1. DALL-E 3 → Video clip (primary)
         if self.openai_client:
-            asset = self._generate_dalle_image(description, output_dir, orientation)
+            asset = self._generate_dalle_video(description, output_dir, orientation)
             if asset:
                 return asset
 
@@ -137,38 +161,26 @@ class AssetCollector:
             if asset:
                 return asset
 
-        # 4. Pexels stock image
-        if self.pexels_key:
-            asset = self._search_pexels_image(description, output_dir)
-            if asset:
-                return asset
-
-        # 5. Stability AI image (last resort)
-        if self.stability_key:
-            asset = self._generate_stability_image(description, output_dir)
-            if asset:
-                return asset
-
         return None
 
     # =========================================================================
-    # DALL-E 3 AI IMAGE GENERATION
+    # DALL-E 3 IMAGE → VIDEO CLIP PIPELINE
     # =========================================================================
 
     @retry(stop=stop_after_attempt(2), wait=wait_exponential(min=3, max=15))
-    def _generate_dalle_image(
+    def _generate_dalle_video(
         self, description: str, output_dir: Path, orientation: str = "landscape"
     ) -> CollectedAsset | None:
-        """Generate a cinematic AI image using DALL-E 3."""
+        """Generate DALL-E 3 image, then convert to dynamic video clip."""
         try:
-            # Build enhanced cinematic prompt
             prompt = DALLE_PROMPT_TEMPLATE.format(description=description)
 
-            # Orientation-specific size
             if orientation == "portrait":
-                size = "1024x1792"  # 9:16 vertical for Shorts
+                size = "1024x1792"
+                resolution = (1080, 1920)
             else:
-                size = "1792x1024"  # 16:9 landscape for main video
+                size = "1792x1024"
+                resolution = (1920, 1080)
 
             response = self.openai_client.images.generate(
                 model="dall-e-3",
@@ -180,26 +192,37 @@ class AssetCollector:
             )
 
             image_data = base64.b64decode(response.data[0].b64_json)
-            output_path = get_unique_path(output_dir, "dalle3", ".png")
-            output_path.write_bytes(image_data)
+            image_path = get_unique_path(output_dir, "dalle3", ".png")
+            image_path.write_bytes(image_data)
 
-            logger.info(f"DALL-E 3 image generated: {output_path} ({size})")
+            total_cost = self.DALLE_COST_PER_IMAGE
+
+            # Convert image to video clip
+            video_path, video_cost = self.video_generator.generate_video_clip(
+                str(image_path),
+                duration=5.0,
+                resolution=resolution,
+            )
+            total_cost += video_cost
+
+            logger.info(f"AI video clip: {video_path} ({size})")
 
             return CollectedAsset(
-                type="ai_image",
+                type="ai_video",
                 source="dall_e_3",
-                local_path=str(output_path),
+                local_path=video_path,
                 source_url="",
                 description=description,
-                cost_usd=self.DALLE_COST_PER_IMAGE,
+                duration_seconds=5.0,
+                cost_usd=total_cost,
             )
 
         except Exception as e:
-            logger.warning(f"DALL-E 3 generation failed for '{description}': {e}")
+            logger.warning(f"DALL-E video pipeline failed for '{description}': {e}")
         return None
 
     # =========================================================================
-    # STOCK VIDEO/IMAGE SOURCES (fallbacks)
+    # STOCK VIDEO SOURCES (fallbacks)
     # =========================================================================
 
     @retry(stop=stop_after_attempt(2), wait=wait_exponential(min=2, max=10))
@@ -286,92 +309,6 @@ class AssetCollector:
             )
         except Exception as e:
             logger.debug(f"Pixabay video search failed for '{query}': {e}")
-        return None
-
-    @retry(stop=stop_after_attempt(2), wait=wait_exponential(min=2, max=10))
-    def _search_pexels_image(
-        self, query: str, output_dir: Path
-    ) -> CollectedAsset | None:
-        """Search and download a stock image from Pexels."""
-        try:
-            resp = self.http.get(
-                f"{self.PEXELS_BASE}/v1/search",
-                params={"query": query, "per_page": 3, "orientation": "landscape"},
-                headers={"Authorization": self.pexels_key},
-            )
-            resp.raise_for_status()
-            data = resp.json()
-
-            photos = data.get("photos", [])
-            if not photos:
-                return None
-
-            photo = photos[0]
-            image_url = photo.get("src", {}).get("large2x") or photo.get("src", {}).get("large")
-            if not image_url:
-                return None
-
-            output_path = get_unique_path(output_dir, "pexels_img", ".jpg")
-            self._download_file(image_url, output_path)
-
-            return CollectedAsset(
-                type="stock_image",
-                source="pexels",
-                local_path=str(output_path),
-                source_url=photo.get("url", ""),
-                description=query,
-                attribution=f"Photo by {photo.get('photographer', 'Unknown')} from Pexels",
-            )
-        except Exception as e:
-            logger.debug(f"Pexels image search failed for '{query}': {e}")
-        return None
-
-    @retry(stop=stop_after_attempt(2), wait=wait_exponential(min=2, max=10))
-    def _generate_stability_image(
-        self, description: str, output_dir: Path
-    ) -> CollectedAsset | None:
-        """Generate an AI image using Stability AI REST API."""
-        try:
-            resp = self.http.post(
-                f"{self.STABILITY_BASE}/generation/stable-diffusion-xl-1024-v1-0/text-to-image",
-                headers={
-                    "Authorization": f"Bearer {self.stability_key}",
-                    "Content-Type": "application/json",
-                    "Accept": "application/json",
-                },
-                json={
-                    "text_prompts": [
-                        {"text": f"{description}, cinematic, 4K, professional photography", "weight": 1}
-                    ],
-                    "cfg_scale": 7,
-                    "width": 1344,
-                    "height": 768,
-                    "steps": 30,
-                    "samples": 1,
-                },
-                timeout=120.0,
-            )
-            resp.raise_for_status()
-            data = resp.json()
-
-            artifacts = data.get("artifacts", [])
-            if not artifacts:
-                return None
-
-            image_data = base64.b64decode(artifacts[0]["base64"])
-            output_path = get_unique_path(output_dir, "ai_img", ".png")
-            output_path.write_bytes(image_data)
-
-            return CollectedAsset(
-                type="ai_image",
-                source="stability_ai",
-                local_path=str(output_path),
-                source_url="",
-                description=description,
-                cost_usd=self.STABILITY_COST_PER_IMAGE,
-            )
-        except Exception as e:
-            logger.debug(f"Stability AI image generation failed: {e}")
         return None
 
     def _download_file(self, url: str, output_path: Path) -> None:
