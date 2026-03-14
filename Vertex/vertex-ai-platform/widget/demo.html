@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vertex AI Widget — Demo</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f0f2f5;
+      color: #1f2937;
+    }
+
+    .demo-header {
+      background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+      color: #fff;
+      padding: 60px 24px 80px;
+      text-align: center;
+    }
+
+    .demo-header h1 {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+
+    .demo-header p {
+      font-size: 18px;
+      opacity: 0.9;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .demo-content {
+      max-width: 800px;
+      margin: -40px auto 60px;
+      padding: 0 24px;
+    }
+
+    .demo-card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 32px;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+      margin-bottom: 24px;
+    }
+
+    .demo-card h2 {
+      font-size: 20px;
+      margin-bottom: 16px;
+      color: #374151;
+    }
+
+    .demo-card p {
+      color: #6b7280;
+      line-height: 1.7;
+      margin-bottom: 12px;
+    }
+
+    .demo-code {
+      background: #1e1e2e;
+      color: #cdd6f4;
+      border-radius: 12px;
+      padding: 20px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      margin-top: 12px;
+    }
+
+    .demo-code .tag { color: #89b4fa; }
+    .demo-code .attr { color: #f9e2af; }
+    .demo-code .val { color: #a6e3a1; }
+
+    .demo-features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    .demo-feature {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 12px;
+      background: #f9fafb;
+      border-radius: 10px;
+    }
+
+    .demo-feature-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: #ede9fe;
+      color: #6366f1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    .demo-feature-text {
+      font-size: 14px;
+      color: #374151;
+      font-weight: 500;
+    }
+
+    .demo-hint {
+      text-align: center;
+      color: #9ca3af;
+      font-size: 14px;
+      margin-top: 32px;
+    }
+
+    .demo-hint span {
+      display: inline-block;
+      animation: bounce 2s ease-in-out infinite;
+    }
+
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="demo-header">
+    <h1>Vertex AI Platform</h1>
+    <p>An enterprise-grade AI chat widget that any business can embed on their website with a single line of code.</p>
+  </div>
+
+  <div class="demo-content">
+    <div class="demo-card">
+      <h2>Quick Start</h2>
+      <p>Add this single script tag to your website to embed the chat widget:</p>
+      <div class="demo-code">
+        <span class="tag">&lt;script</span>
+        <span class="attr"> src</span>=<span class="val">"dist/vertex-widget.js"</span><br>
+        &nbsp;&nbsp;<span class="attr">data-tenant-slug</span>=<span class="val">"demo-clinic"</span><br>
+        &nbsp;&nbsp;<span class="attr">data-primary-color</span>=<span class="val">"#6366f1"</span><br>
+        &nbsp;&nbsp;<span class="attr">data-position</span>=<span class="val">"bottom-right"</span><span class="tag">&gt;&lt;/script&gt;</span>
+      </div>
+    </div>
+
+    <div class="demo-card">
+      <h2>Features</h2>
+      <div class="demo-features">
+        <div class="demo-feature">
+          <div class="demo-feature-icon">WS</div>
+          <div class="demo-feature-text">Real-time WebSocket with REST fallback</div>
+        </div>
+        <div class="demo-feature">
+          <div class="demo-feature-icon">UI</div>
+          <div class="demo-feature-text">Beautiful, responsive design</div>
+        </div>
+        <div class="demo-feature">
+          <div class="demo-feature-icon">SD</div>
+          <div class="demo-feature-text">Shadow DOM isolation</div>
+        </div>
+        <div class="demo-feature">
+          <div class="demo-feature-icon">LS</div>
+          <div class="demo-feature-text">localStorage persistence</div>
+        </div>
+        <div class="demo-feature">
+          <div class="demo-feature-icon">MB</div>
+          <div class="demo-feature-text">Mobile-first responsive</div>
+        </div>
+        <div class="demo-feature">
+          <div class="demo-feature-icon">CL</div>
+          <div class="demo-feature-text">Customizable colors</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="demo-card">
+      <h2>Configuration</h2>
+      <p>Customize the widget using data attributes on the script tag:</p>
+      <div class="demo-code">
+        <span class="attr">data-tenant-slug</span> &nbsp;&nbsp;&nbsp; — Your business slug (required)<br>
+        <span class="attr">data-primary-color</span> &nbsp;— Brand color, e.g. #6366f1<br>
+        <span class="attr">data-position</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;— bottom-right or bottom-left<br>
+        <span class="attr">data-api-base-url</span> &nbsp;— API server URL (default: same origin)<br>
+        <span class="attr">data-ws-base-url</span> &nbsp;&nbsp;— WebSocket server URL (auto-derived)
+      </div>
+    </div>
+
+    <div class="demo-card">
+      <h2>Programmatic API</h2>
+      <p>Control the widget from your JavaScript code:</p>
+      <div class="demo-code">
+        <span class="tag">// Open the chat panel</span><br>
+        window.vertexWidget.open();<br><br>
+        <span class="tag">// Close the chat panel</span><br>
+        window.vertexWidget.close();<br><br>
+        <span class="tag">// Remove the widget entirely</span><br>
+        window.vertexWidget.destroy();
+      </div>
+    </div>
+
+    <p class="demo-hint">
+      <span>Click the chat bubble in the bottom-right corner to try it out.</span>
+    </p>
+  </div>
+
+  <!-- Vertex AI Chat Widget -->
+  <script src="dist/vertex-widget.js"
+    data-tenant-slug="demo-clinic"
+    data-primary-color="#6366f1"
+    data-api-base-url="http://localhost:8000">
+  </script>
+
+</body>
+</html>

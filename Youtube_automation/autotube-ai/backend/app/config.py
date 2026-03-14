@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     # --- AI APIs ---
     ANTHROPIC_API_KEY: str = ""
     STABILITY_API_KEY: str = ""
+    RUNWAY_API_KEY: str = ""
     ELEVENLABS_API_KEY: str = ""
     ELEVENLABS_VOICE_ID: str = ""
     OPENAI_API_KEY: str = ""

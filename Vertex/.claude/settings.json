@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(chmod +x /Users/nageshmuniraja/AI_projects/Vertex/vertex-ai-platform/scripts/start-dev.sh)"
+    ]
+  }
+}

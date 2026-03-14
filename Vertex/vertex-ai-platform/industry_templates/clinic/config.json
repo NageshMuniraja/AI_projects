@@ -1,0 +1,87 @@
+{
+  "industry": "clinic",
+  "display_name": "Medical Clinic",
+  "ai_persona_name": "Clinic Assistant",
+  "ai_tone": "professional",
+  "greeting_message": "Hello! Welcome to our medical clinic. I'm your AI assistant and I can help you schedule appointments, find the right doctor, or answer general questions about our services. How may I assist you?",
+  "fallback_message": "For this query, I'd recommend speaking with our clinic staff directly. Please call our reception or leave your contact details and we'll reach out to you.",
+  "services": [
+    {
+      "name": "General Consultation",
+      "description": "General physician consultation",
+      "duration_minutes": 20,
+      "price": 500,
+      "category": "general"
+    },
+    {
+      "name": "Specialist Consultation",
+      "description": "Consultation with a specialist doctor",
+      "duration_minutes": 30,
+      "price": 1000,
+      "category": "specialist"
+    },
+    {
+      "name": "Blood Test - Complete Blood Count",
+      "description": "CBC blood test with report",
+      "duration_minutes": 15,
+      "price": 400,
+      "category": "lab"
+    },
+    {
+      "name": "Full Body Health Checkup",
+      "description": "Comprehensive health screening package",
+      "duration_minutes": 120,
+      "price": 3500,
+      "category": "preventive"
+    },
+    {
+      "name": "Vaccination",
+      "description": "Standard vaccination services",
+      "duration_minutes": 15,
+      "price": 800,
+      "category": "preventive"
+    },
+    {
+      "name": "ECG",
+      "description": "Electrocardiogram test",
+      "duration_minutes": 15,
+      "price": 300,
+      "category": "diagnostic"
+    },
+    {
+      "name": "X-Ray",
+      "description": "Digital X-ray imaging",
+      "duration_minutes": 20,
+      "price": 600,
+      "category": "diagnostic"
+    },
+    {
+      "name": "Physiotherapy Session",
+      "description": "Physical therapy and rehabilitation session",
+      "duration_minutes": 45,
+      "price": 800,
+      "category": "therapy"
+    }
+  ],
+  "knowledge_base": [
+    {
+      "title": "Clinic FAQ",
+      "category": "faq",
+      "content": "Q: What are your consultation hours?\nA: Our clinic operates Monday to Saturday. General consultations are available all day. Specialist timings vary - please ask about specific doctors.\n\nQ: Do I need to fast for blood tests?\nA: For most blood tests including lipid profile and blood sugar, we recommend fasting for 10-12 hours before the test. Water is fine.\n\nQ: How do I get my lab reports?\nA: Lab reports are typically available within 24-48 hours. You can collect them from our reception or we can send them via email/WhatsApp.\n\nQ: Do you accept health insurance?\nA: Yes, we accept most major health insurance providers. Please carry your insurance card and ID.\n\nQ: Is there parking available?\nA: Yes, we have free parking available for patients in our building basement."
+    },
+    {
+      "title": "Pre-Visit Instructions",
+      "category": "policies",
+      "content": "Before Your Visit:\n- Bring your previous medical records and prescriptions\n- Carry your insurance card and photo ID\n- Arrive 10 minutes early for registration if you're a new patient\n- Prepare a list of current medications and allergies\n- Fast for 10-12 hours if you have blood tests scheduled\n\nEmergency:\n- For medical emergencies, call 108 or visit the nearest emergency room\n- Our clinic handles minor emergencies and can provide first-aid\n- For after-hours medical advice, call our helpline"
+    }
+  ],
+  "business_hours": {
+    "Monday": "8:00 AM - 8:00 PM",
+    "Tuesday": "8:00 AM - 8:00 PM",
+    "Wednesday": "8:00 AM - 8:00 PM",
+    "Thursday": "8:00 AM - 8:00 PM",
+    "Friday": "8:00 AM - 8:00 PM",
+    "Saturday": "8:00 AM - 2:00 PM",
+    "Sunday": "Closed"
+  }
+}

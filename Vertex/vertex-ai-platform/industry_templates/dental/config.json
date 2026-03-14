@@ -1,0 +1,87 @@
+{
+  "industry": "dental",
+  "display_name": "Dental Clinic",
+  "ai_persona_name": "Dr. AI Assistant",
+  "ai_tone": "professional",
+  "greeting_message": "Hello! Welcome to our dental clinic. I'm your AI assistant. I can help you book appointments, learn about our services, or answer questions about dental care. How can I help you today?",
+  "fallback_message": "I'd like to connect you with our dental team for this. Please call us or leave your number and we'll get back to you shortly.",
+  "services": [
+    {
+      "name": "Dental Cleaning & Checkup",
+      "description": "Routine teeth cleaning and oral examination",
+      "duration_minutes": 45,
+      "price": 1500,
+      "category": "preventive"
+    },
+    {
+      "name": "Dental Filling",
+      "description": "Tooth-colored composite filling for cavities",
+      "duration_minutes": 30,
+      "price": 2000,
+      "category": "restorative"
+    },
+    {
+      "name": "Root Canal Treatment",
+      "description": "Endodontic treatment to save infected teeth",
+      "duration_minutes": 60,
+      "price": 8000,
+      "category": "restorative"
+    },
+    {
+      "name": "Teeth Whitening",
+      "description": "Professional in-office teeth whitening treatment",
+      "duration_minutes": 60,
+      "price": 5000,
+      "category": "cosmetic"
+    },
+    {
+      "name": "Dental Crown",
+      "description": "Ceramic or zirconia dental crown",
+      "duration_minutes": 60,
+      "price": 12000,
+      "category": "restorative"
+    },
+    {
+      "name": "Braces Consultation",
+      "description": "Orthodontic consultation for braces or aligners",
+      "duration_minutes": 30,
+      "price": 500,
+      "category": "orthodontics"
+    },
+    {
+      "name": "Tooth Extraction",
+      "description": "Simple or surgical tooth extraction",
+      "duration_minutes": 30,
+      "price": 1500,
+      "category": "surgical"
+    },
+    {
+      "name": "Dental Implant",
+      "description": "Titanium implant with crown restoration",
+      "duration_minutes": 90,
+      "price": 35000,
+      "category": "surgical"
+    }
+  ],
+  "knowledge_base": [
+    {
+      "title": "Dental Care FAQ",
+      "category": "faq",
+      "content": "Q: How often should I visit the dentist?\nA: We recommend a dental checkup and cleaning every 6 months for most patients. Those with gum disease may need more frequent visits.\n\nQ: Does teeth cleaning hurt?\nA: Professional cleaning is generally painless. You may feel slight sensitivity during scaling, but our team ensures your comfort throughout.\n\nQ: How long does a root canal take?\nA: A root canal typically takes 1-2 visits, each lasting about 60-90 minutes depending on the tooth.\n\nQ: Do you accept insurance?\nA: Yes, we work with most major dental insurance providers. Please bring your insurance card to your first visit.\n\nQ: What should I do in a dental emergency?\nA: For severe pain, swelling, or a knocked-out tooth, call our emergency number immediately. For a knocked-out tooth, keep it moist in milk and come in within 30 minutes."
+    },
+    {
+      "title": "Pre-Procedure Instructions",
+      "category": "policies",
+      "content": "Before Your Dental Appointment:\n- Brush and floss your teeth before your visit\n- Arrive 15 minutes early for paperwork if you're a new patient\n- Inform us of any medications you're taking\n- Let us know if you have any allergies\n- If you feel anxious, let us know - we offer sedation options\n\nAfter a Dental Procedure:\n- Avoid eating until numbness wears off (usually 2-3 hours)\n- Take prescribed medications as directed\n- Apply ice for swelling (20 minutes on, 20 minutes off)\n- Stick to soft foods for 24-48 hours after extractions\n- Call us if you experience severe pain or prolonged bleeding"
+    }
+  ],
+  "business_hours": {
+    "Monday": "9:00 AM - 7:00 PM",
+    "Tuesday": "9:00 AM - 7:00 PM",
+    "Wednesday": "9:00 AM - 7:00 PM",
+    "Thursday": "9:00 AM - 7:00 PM",
+    "Friday": "9:00 AM - 7:00 PM",
+    "Saturday": "9:00 AM - 2:00 PM",
+    "Sunday": "Closed"
+  }
+}

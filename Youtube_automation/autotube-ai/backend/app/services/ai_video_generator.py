@@ -1,15 +1,15 @@
 """AI Video Generator — converts static images into dynamic video clips.
 
-Two providers:
-1. Stability AI SVD (image-to-video API, ~4s clips, requires API key)
-2. Advanced motion synthesis (always available, zero API cost):
+Three providers (tried in order):
+1. Runway Gen-3 Alpha Turbo (image-to-video, ~5-10s clips, best quality)
+2. Stability AI SVD (image-to-video, ~4s clips, good quality)
+3. Advanced motion synthesis (always available, zero API cost):
    - Cinematic camera drift with smooth noise
    - Multi-directional movement (drift_zoom, parallax, sweep, cinematic_pan)
    - Volumetric light sweep overlay
    - Dynamic vignette with breathing
-   - Film-like subtle grain
 
-This replaces basic Ken Burns with footage that looks like real cinematography.
+Priority: Runway > Stability SVD > Motion Synthesis
 """
 
 import math
@@ -30,12 +30,18 @@ from app.utils.file_manager import get_unique_path
 class AIVideoGenerator:
     """Convert static images into dynamic video clips."""
 
+    # Runway Gen-3 Alpha Turbo
+    RUNWAY_API_BASE = "https://api.dev.runwayml.com/v1"
+    RUNWAY_COST_PER_SEC = 0.05  # ~$0.50 for 10s
+
+    # Stability AI SVD
     STABILITY_VIDEO_URL = "https://api.stability.ai/v2beta/image-to-video"
     SVD_COST_PER_VIDEO = 0.20
 
     def __init__(self):
+        self.runway_key = settings.RUNWAY_API_KEY
         self.stability_key = settings.STABILITY_API_KEY
-        self.http = httpx.Client(timeout=120.0)
+        self.http = httpx.Client(timeout=180.0)
 
     def generate_video_clip(
         self,
@@ -43,21 +49,155 @@ class AIVideoGenerator:
         duration: float = 5.0,
         resolution: tuple[int, int] = (1920, 1080),
         fps: int = 30,
+        prompt: str = "",
     ) -> tuple[str, float]:
         """Convert a static image into a dynamic video clip.
 
         Returns: (video_path, cost_usd)
-        Tries Stability AI SVD first, falls back to motion synthesis.
+        Priority: Runway Gen-3 > Stability SVD > Motion Synthesis.
         """
-        # Try Stability AI SVD
+        # 1. Try Runway Gen-3 Alpha Turbo (best quality)
+        if self.runway_key:
+            video_path = self._generate_runway_video(image_path, duration, prompt)
+            if video_path:
+                cost = duration * self.RUNWAY_COST_PER_SEC
+                return video_path, cost
+
+        # 2. Try Stability AI SVD
         if self.stability_key:
             video_path = self._generate_stability_video(image_path)
             if video_path:
                 return video_path, self.SVD_COST_PER_VIDEO
 
-        # Fallback: Advanced motion synthesis (free)
+        # 3. Fallback: Advanced motion synthesis (free)
         video_path = self._generate_motion_clip(image_path, duration, resolution, fps)
         return video_path, 0.0
+
+    # =========================================================================
+    # RUNWAY GEN-3 ALPHA TURBO (IMAGE-TO-VIDEO)
+    # =========================================================================
+
+    def _generate_runway_video(
+        self,
+        image_path: str,
+        duration: float = 5.0,
+        prompt: str = "",
+    ) -> str | None:
+        """Generate video using Runway Gen-3 Alpha Turbo image-to-video.
+
+        - Accepts image + optional text prompt for motion guidance
+        - Generates 5s or 10s clips at 768x1344 (portrait) or 1344x768 (landscape)
+        - Async: start task, poll for completion
+        """
+        try:
+            import base64
+
+            img = Image.open(image_path).convert("RGB")
+
+            # Determine orientation from image aspect ratio
+            is_portrait = img.height > img.width
+
+            # Encode image to base64 data URI
+            from io import BytesIO
+            buf = BytesIO()
+            img.save(buf, format="PNG")
+            img_b64 = base64.b64encode(buf.getvalue()).decode()
+            data_uri = f"data:image/png;base64,{img_b64}"
+
+            # Motion prompt — guide the animation
+            if not prompt:
+                prompt = (
+                    "Smooth cinematic camera movement, slow dolly forward, "
+                    "subtle parallax depth, atmospheric lighting shifts, "
+                    "professional film quality"
+                )
+
+            # Determine duration parameter (Runway supports 5 or 10 seconds)
+            runway_duration = 10 if duration > 7 else 5
+
+            # Start generation task
+            headers = {
+                "Authorization": f"Bearer {self.runway_key}",
+                "Content-Type": "application/json",
+                "X-Runway-Version": "2024-11-06",
+            }
+
+            payload = {
+                "promptImage": data_uri,
+                "promptText": prompt,
+                "model": "gen3a_turbo",
+                "duration": runway_duration,
+                "watermark": False,
+            }
+
+            response = self.http.post(
+                f"{self.RUNWAY_API_BASE}/image_to_video",
+                headers=headers,
+                json=payload,
+            )
+
+            if response.status_code not in (200, 201):
+                logger.warning(
+                    f"Runway start failed: {response.status_code} - "
+                    f"{response.text[:200]}"
+                )
+                return None
+
+            task_id = response.json().get("id")
+            if not task_id:
+                logger.warning("Runway: no task ID returned")
+                return None
+
+            logger.info(f"Runway Gen-3 task started: {task_id} ({runway_duration}s)")
+
+            # Poll for completion (max ~3 minutes)
+            output_path = get_unique_path(settings.temp_dir, "runway_video", ".mp4")
+            settings.temp_dir.mkdir(parents=True, exist_ok=True)
+
+            for attempt in range(36):
+                time.sleep(5)
+
+                status_resp = self.http.get(
+                    f"{self.RUNWAY_API_BASE}/tasks/{task_id}",
+                    headers=headers,
+                )
+
+                if status_resp.status_code != 200:
+                    continue
+
+                task_data = status_resp.json()
+                status = task_data.get("status", "")
+
+                if status == "SUCCEEDED":
+                    output_urls = task_data.get("output", [])
+                    if not output_urls:
+                        logger.warning("Runway: no output URL in completed task")
+                        return None
+
+                    video_url = output_urls[0] if isinstance(output_urls, list) else output_urls
+                    video_resp = self.http.get(video_url)
+                    if video_resp.status_code == 200:
+                        output_path.write_bytes(video_resp.content)
+                        logger.info(f"Runway Gen-3 video: {output_path} ({runway_duration}s)")
+                        return str(output_path)
+                    else:
+                        logger.warning(f"Runway download failed: {video_resp.status_code}")
+                        return None
+
+                elif status == "FAILED":
+                    failure = task_data.get("failure", "unknown")
+                    logger.warning(f"Runway generation failed: {failure}")
+                    return None
+
+                elif status in ("THROTTLED", "RUNNING", "PENDING"):
+                    continue
+
+            logger.warning("Runway timed out after 3 minutes")
+            return None
+
+        except Exception as e:
+            logger.warning(f"Runway Gen-3 failed: {e}")
+            return None
 
     # =========================================================================
     # STABILITY AI SVD (IMAGE-TO-VIDEO)

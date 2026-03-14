@@ -1,0 +1,96 @@
+{
+  "industry": "salon",
+  "display_name": "Beauty Salon & Spa",
+  "ai_persona_name": "Beauty AI",
+  "ai_tone": "friendly",
+  "greeting_message": "Hey there! ✨ Welcome to our salon! I'm your AI beauty assistant. I can help you book appointments, explore our services, or recommend the perfect treatment for you. What are you looking for today?",
+  "fallback_message": "Let me connect you with our team! You can also call us directly or drop in at the salon. We'd love to see you!",
+  "services": [
+    {
+      "name": "Women's Haircut & Styling",
+      "description": "Professional haircut with wash and blow-dry styling",
+      "duration_minutes": 60,
+      "price": 800,
+      "category": "hair"
+    },
+    {
+      "name": "Men's Haircut",
+      "description": "Precision haircut with styling",
+      "duration_minutes": 30,
+      "price": 400,
+      "category": "hair"
+    },
+    {
+      "name": "Hair Coloring",
+      "description": "Full head single-process color",
+      "duration_minutes": 120,
+      "price": 3000,
+      "category": "hair"
+    },
+    {
+      "name": "Highlights / Balayage",
+      "description": "Partial or full highlights with toner",
+      "duration_minutes": 150,
+      "price": 5000,
+      "category": "hair"
+    },
+    {
+      "name": "Keratin Treatment",
+      "description": "Smoothing keratin treatment for frizz-free hair",
+      "duration_minutes": 180,
+      "price": 6000,
+      "category": "hair"
+    },
+    {
+      "name": "Classic Facial",
+      "description": "Deep cleansing facial with extraction and mask",
+      "duration_minutes": 60,
+      "price": 1500,
+      "category": "skin"
+    },
+    {
+      "name": "Manicure & Pedicure",
+      "description": "Classic mani-pedi with nail polish",
+      "duration_minutes": 75,
+      "price": 1000,
+      "category": "nails"
+    },
+    {
+      "name": "Full Body Waxing",
+      "description": "Complete body waxing service",
+      "duration_minutes": 90,
+      "price": 2500,
+      "category": "grooming"
+    },
+    {
+      "name": "Bridal Makeup Package",
+      "description": "Complete bridal makeup with trial session",
+      "duration_minutes": 180,
+      "price": 15000,
+      "category": "bridal"
+    },
+    {
+      "name": "Head Massage & Hair Spa",
+      "description": "Relaxing head massage with deep conditioning hair spa",
+      "duration_minutes": 45,
+      "price": 1200,
+      "category": "spa"
+    }
+  ],
+  "knowledge_base": [
+    {
+      "title": "Salon Services FAQ",
+      "category": "faq",
+      "content": "Q: Do I need to book in advance?\nA: We recommend booking at least 24 hours in advance, especially for weekends. Walk-ins are welcome based on availability.\n\nQ: Can I request a specific stylist?\nA: Absolutely! Let us know your preferred stylist when booking and we'll do our best to accommodate.\n\nQ: How long does hair coloring take?\nA: Single-process color takes about 2 hours. Highlights and balayage can take 2.5-3 hours depending on hair length.\n\nQ: Do you have a cancellation policy?\nA: We ask for at least 4 hours notice for cancellations. Late cancellations may be charged 50% of the service fee.\n\nQ: Do you offer gift cards?\nA: Yes! Gift cards are available in any denomination. They make perfect gifts for any occasion."
+    }
+  ],
+  "business_hours": {
+    "Monday": "Closed",
+    "Tuesday": "10:00 AM - 8:00 PM",
+    "Wednesday": "10:00 AM - 8:00 PM",
+    "Thursday": "10:00 AM - 8:00 PM",
+    "Friday": "10:00 AM - 9:00 PM",
+    "Saturday": "9:00 AM - 9:00 PM",
+    "Sunday": "10:00 AM - 6:00 PM"
+  }
+}

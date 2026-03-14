@@ -1,0 +1,61 @@
+{
+  "industry": "real_estate",
+  "display_name": "Real Estate Agency",
+  "ai_persona_name": "Property AI",
+  "ai_tone": "professional",
+  "greeting_message": "Welcome! I'm your AI property assistant. Whether you're looking to buy, sell, or rent, I can help you find the perfect property, schedule viewings, or answer any real estate questions. What are you looking for today?",
+  "fallback_message": "I'd like to connect you with one of our property experts for personalized assistance. Please share your phone number and our team will reach out shortly.",
+  "services": [
+    {
+      "name": "Property Viewing",
+      "description": "Scheduled visit to view a property",
+      "duration_minutes": 45,
+      "price": 0,
+      "category": "viewing"
+    },
+    {
+      "name": "Property Valuation",
+      "description": "Professional property valuation report",
+      "duration_minutes": 60,
+      "price": 2000,
+      "category": "valuation"
+    },
+    {
+      "name": "Buyer Consultation",
+      "description": "One-on-one consultation for property buyers",
+      "duration_minutes": 30,
+      "price": 0,
+      "category": "consultation"
+    },
+    {
+      "name": "Seller Consultation",
+      "description": "Consultation for property sellers on pricing and strategy",
+      "duration_minutes": 30,
+      "price": 0,
+      "category": "consultation"
+    },
+    {
+      "name": "Legal Documentation",
+      "description": "Assistance with property documentation and verification",
+      "duration_minutes": 60,
+      "price": 5000,
+      "category": "legal"
+    }
+  ],
+  "knowledge_base": [
+    {
+      "title": "Real Estate FAQ",
+      "category": "faq",
+      "content": "Q: How do I start the home buying process?\nA: Start by determining your budget, getting pre-approved for a loan, and then let us help you find properties that match your requirements.\n\nQ: What documents do I need to buy a property?\nA: You'll need identity proof, address proof, PAN card, bank statements, salary slips, and loan pre-approval if applicable.\n\nQ: How long does the buying process take?\nA: From property selection to registration, it typically takes 30-60 days depending on the type of property and financing.\n\nQ: Do you help with home loans?\nA: Yes, we have partnerships with major banks and can help you get the best home loan rates.\n\nQ: What are the hidden costs in buying a property?\nA: Beyond the property price, expect stamp duty (5-7%), registration charges (1-2%), GST on under-construction properties, legal fees, and maintenance deposits."
+    }
+  ],
+  "business_hours": {
+    "Monday": "9:00 AM - 7:00 PM",
+    "Tuesday": "9:00 AM - 7:00 PM",
+    "Wednesday": "9:00 AM - 7:00 PM",
+    "Thursday": "9:00 AM - 7:00 PM",
+    "Friday": "9:00 AM - 7:00 PM",
+    "Saturday": "10:00 AM - 5:00 PM",
+    "Sunday": "10:00 AM - 2:00 PM"
+  }
+}
