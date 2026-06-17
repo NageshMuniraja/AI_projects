@@ -1,0 +1,42 @@
+[
+  {
+    "question": "How long is the free trial and do I need a credit card?",
+    "ground_truth": "The free trial is 14 days of Helios Compute with up to 2 servers, and no credit card is required."
+  },
+  {
+    "question": "What service credit do I get if monthly uptime is 98.5 percent?",
+    "ground_truth": "Below 99.0 percent uptime, customers get a 25 percent service credit."
+  },
+  {
+    "question": "How many days do I have to request a full refund?",
+    "ground_truth": "A full refund can be requested within 30 days of the first paid invoice."
+  },
+  {
+    "question": "How much does Premium support cost and what response time does it offer?",
+    "ground_truth": "Premium support costs 499 dollars per month and offers a one hour response time with a dedicated technical account manager."
+  },
+  {
+    "question": "Which regions can Helios Store data be hosted in?",
+    "ground_truth": "North America, Europe, and Asia Pacific."
+  },
+  {
+    "question": "What encryption does Helios use in transit?",
+    "ground_truth": "TLS 1.3 for data in transit (and AES-256 at rest)."
+  },
+  {
+    "question": "What does error E-4021 mean?",
+    "ground_truth": "It means a virtual server failed to attach its boot volume within 60 seconds."
+  },
+  {
+    "question": "Where does Helios Pipe send messages that keep failing?",
+    "ground_truth": "To a dead-letter topic named Abyss, reviewed daily by an engineer."
+  },
+  {
+    "question": "What discount do I get for paying annually?",
+    "ground_truth": "Annual prepayment receives a 15 percent discount."
+  },
+  {
+    "question": "Can I pay with Dogecoin?",
+    "ground_truth": "The documents do not say; payment by Dogecoin is not mentioned, so the system should refuse."
+  }
+]

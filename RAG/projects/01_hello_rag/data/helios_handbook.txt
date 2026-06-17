@@ -1,0 +1,31 @@
+Helios Cloud — Customer Handbook
+
+About Helios Cloud
+Helios Cloud is a fictional company used for this RAG course. It sells three products: Helios Compute (virtual servers), Helios Store (object storage), and Helios Pipe (a managed data pipeline). All examples and policies below are invented for teaching purposes.
+
+Refund Policy
+Customers may request a full refund within 30 days of their first paid invoice. Refunds are issued to the original payment method within 10 business days. After 30 days, only prorated credits are offered, applied to the next billing cycle. Refunds do not apply to one-time professional services fees.
+
+Free Trial
+Every new account includes a 14-day free trial of Helios Compute with up to 2 virtual servers. No credit card is required to start the trial. When the trial ends, the account pauses until a payment method is added; data is retained for 30 days after the trial ends.
+
+Support Tiers
+Helios offers three support tiers. Basic support is free and answers within two business days by email. Standard support costs 99 dollars per month and answers within four business hours. Premium support costs 499 dollars per month, answers within one hour, and includes a dedicated technical account manager.
+
+Service Level Agreement
+Helios Compute guarantees 99.9 percent monthly uptime. If uptime falls below this, customers receive service credits: 10 percent credit for uptime between 99.0 and 99.9 percent, and 25 percent credit for uptime below 99.0 percent. Credits must be requested within 30 days of the incident.
+
+Data Regions
+Helios Store data can be hosted in three regions: North America, Europe, and Asia Pacific. Data does not leave the selected region. Customers on the Premium support tier may request a custom data residency arrangement.
+
+Security
+All data is encrypted at rest using AES-256 and in transit using TLS 1.3. Helios is SOC 2 Type II certified. Customers can enable two-factor authentication and single sign-on through SAML. Access logs are retained for 12 months.
+
+Billing
+Invoices are issued monthly on the first day of the month. Payment is due within 15 days. Accounts more than 30 days overdue are suspended. Annual prepayment receives a 15 percent discount.
+
+Account Cancellation
+Customers may cancel at any time from the account dashboard. Cancellation stops future billing but does not refund the current billing period unless the 30-day refund policy applies. After cancellation, data is retained for 30 days, then permanently deleted.
+
+Contact
+Support can be reached at support@helios.example for all tiers. Premium customers also have a private phone line and a dedicated account manager.

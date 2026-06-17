@@ -1,0 +1,25 @@
+# Secrets
+.env
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Vector store / caches
+.chroma/
+**/.chroma/
+.embedding_cache/
+**/.embedding_cache/
+*.sqlite3
+.cache/
+models/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Eval outputs
+**/eval_results/
+*.log
